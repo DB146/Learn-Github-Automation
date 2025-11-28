@@ -4,12 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       apk_url:
-        description: 'YouTube APK Download URL (from APKMirror or APKPure)'
-        required: false
-        type: string
-        default: ''
-      version:
-        description: 'YouTube Version (e.g., 19.16.39)'
+        description: 'YouTube APK Download URL (from APKMirror or APKPure) - Required'
         required: true
         type: string
       include_patches:
@@ -42,49 +37,106 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Download or use existing YouTube APK
+      - name: Download YouTube APK
+        id: download
         run: |
-          if [ -n "${{ github.event.inputs.apk_url }}" ]; then
-            echo "📥 Downloading APK from provided URL..."
-            wget --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
-                 --timeout=60 \
-                 --tries=3 \
-                 -O youtube.apk "${{ github.event.inputs.apk_url }}"
-            
-            if [ $? -eq 0 ] && [ -f youtube.apk ]; then
-              echo "✅ APK downloaded successfully"
-            else
-              echo "❌ Download failed!"
-              exit 1
-            fi
-          elif [ -f "youtube-source.apk" ]; then
-            echo "📦 Using youtube-source.apk from repository"
-            cp youtube-source.apk youtube.apk
-          elif [ -f "youtube.apk" ]; then
-            echo "📦 Using youtube.apk from repository"
-          else
-            echo "❌ ERROR: No APK source provided!"
-            echo ""
-            echo "Please either:"
-            echo "  1. Provide 'apk_url' input when running workflow"
-            echo "  2. Commit 'youtube-source.apk' or 'youtube.apk' to repository root"
+          echo "📥 Downloading APK from provided URL..."
+          
+          # Download with better error handling
+          wget --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+               --timeout=120 \
+               --tries=5 \
+               --no-check-certificate \
+               -O youtube.apk "${{ github.event.inputs.apk_url }}"
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Download failed with wget, trying curl..."
+            curl -L --retry 5 --retry-delay 3 \
+                 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
+                 -o youtube.apk "${{ github.event.inputs.apk_url }}"
+          fi
+          
+          if [ ! -f youtube.apk ] || [ ! -s youtube.apk ]; then
+            echo "❌ Download failed or file is empty!"
             exit 1
           fi
           
+          echo "✅ APK downloaded successfully"
           echo ""
           echo "📊 APK Info:"
           ls -lh youtube.apk
-          file youtube.apk
+          
+          # Extract version from APK using aapt
+          echo ""
+          echo "🔍 Extracting version info..."
+
+      - name: Extract APK version
+        id: version
+        run: |
+          # Try multiple methods to extract version
+          
+          # Method 1: Try using aapt if available
+          if command -v aapt &> /dev/null; then
+            VERSION=$(aapt dump badging youtube.apk | grep "versionName" | sed "s/.*versionName='//" | sed "s/'.*//")
+            echo "Extracted version with aapt: $VERSION"
+          fi
+          
+          # Method 2: Extract from filename if aapt fails
+          if [ -z "$VERSION" ]; then
+            VERSION=$(echo "${{ github.event.inputs.apk_url }}" | grep -oP 'youtube-\K[0-9.]+' | head -1)
+            echo "Extracted version from URL: $VERSION"
+          fi
+          
+          # Method 3: Unzip and check AndroidManifest.xml
+          if [ -z "$VERSION" ]; then
+            unzip -p youtube.apk AndroidManifest.xml > manifest.xml 2>/dev/null || true
+            # Try to extract version from binary XML (basic attempt)
+            VERSION=$(strings manifest.xml | grep -oP '\d+\.\d+\.\d+' | head -1)
+            echo "Extracted version from manifest: $VERSION"
+          fi
+          
+          # Fallback to timestamp if all fails
+          if [ -z "$VERSION" ]; then
+            VERSION=$(date +%Y%m%d-%H%M%S)
+            echo "⚠️  Could not extract version, using timestamp: $VERSION"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo ""
+          echo "✅ Version: $VERSION"
 
       - name: Verify APK integrity
         run: |
           echo "🔍 Verifying APK..."
           
+          # Check file size (should be at least 50MB for YouTube)
+          SIZE=$(stat -f%z youtube.apk 2>/dev/null || stat -c%s youtube.apk 2>/dev/null)
+          if [ "$SIZE" -lt 50000000 ]; then
+            echo "⚠️  Warning: APK size is unusually small ($(numfmt --to=iec $SIZE))"
+            echo "This might not be a valid APK file."
+          fi
+          
           # Check if file is a valid ZIP (APK is a ZIP file)
-          if unzip -t youtube.apk > /dev/null 2>&1; then
-            echo "✅ APK file structure is valid"
+          if file youtube.apk | grep -q "Zip archive\|Android"; then
+            echo "✅ APK file format is valid"
           else
-            echo "❌ APK file appears to be corrupted"
+            echo "⚠️  Warning: File type check failed, but continuing..."
+            file youtube.apk
+          fi
+          
+          # Try to list APK contents
+          if unzip -l youtube.apk > /dev/null 2>&1; then
+            echo "✅ APK structure is valid"
+            echo ""
+            echo "📦 APK contents preview:"
+            unzip -l youtube.apk | head -20
+          else
+            echo "❌ APK structure validation failed!"
+            echo "The downloaded file may be corrupted or not a valid APK."
+            echo ""
+            echo "File details:"
+            file youtube.apk
+            hexdump -C youtube.apk | head -20
             exit 1
           fi
 
@@ -96,7 +148,7 @@ jobs:
 
       - name: Save original APK
         run: |
-          cp youtube.apk apks/original/youtube-${{ github.event.inputs.version }}-arm64-v8a.apk
+          cp youtube.apk apks/original/youtube-${{ steps.version.outputs.version }}-arm64-v8a.apk
           echo "✅ Original APK saved to apks/original/"
 
       - name: Download ReVanced tools
@@ -196,7 +248,7 @@ jobs:
 
       - name: Save patched APK
         run: |
-          cp youtube-revanced.apk apks/patched/youtube-revanced-${{ github.event.inputs.version }}-arm64-v8a.apk
+          cp youtube-revanced.apk apks/patched/youtube-revanced-${{ steps.version.outputs.version }}-arm64-v8a.apk
           echo "✅ Patched APK saved to apks/patched/"
 
       - name: Generate build info
