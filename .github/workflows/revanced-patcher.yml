@@ -171,24 +171,17 @@ jobs:
           echo "Version: $PATCHES_VERSION"
           wget -q --show-progress -O revanced-patches.rvp "$PATCHES_URL"
           
-          echo ""
-          echo "Fetching ReVanced Integrations..."
-          INTEGRATIONS_URL=$(curl -s https://api.github.com/repos/revanced/revanced-integrations/releases/latest | \
-                             jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url')
-          INTEGRATIONS_VERSION=$(curl -s https://api.github.com/repos/revanced/revanced-integrations/releases/latest | jq -r '.tag_name')
-          echo "Version: $INTEGRATIONS_VERSION"
-          wget -q --show-progress -O revanced-integrations.apk "$INTEGRATIONS_URL"
+          # Note: Integrations download removed as it is usually bundled or not needed as a separate merge arg in new CLI
           
           echo ""
-          echo "✅ All ReVanced tools downloaded"
+          echo "✅ ReVanced tools downloaded"
           echo ""
           echo "📊 Downloaded files:"
-          ls -lh revanced-cli.jar revanced-patches.rvp revanced-integrations.apk
+          ls -lh revanced-cli.jar revanced-patches.rvp
           
           # Save versions to file
           echo "CLI_VERSION=$CLI_VERSION" >> versions.txt
           echo "PATCHES_VERSION=$PATCHES_VERSION" >> versions.txt
-          echo "INTEGRATIONS_VERSION=$INTEGRATIONS_VERSION" >> versions.txt
 
       - name: List available patches
         run: |
@@ -204,9 +197,9 @@ jobs:
           echo ""
           
           # Build patch command
+          # UPDATED: Use --patches instead of --patch-bundle, remove --merge
           PATCH_CMD="java -jar revanced-cli.jar patch"
-          PATCH_CMD="$PATCH_CMD --patch-bundle revanced-patches.rvp"
-          PATCH_CMD="$PATCH_CMD --merge revanced-integrations.apk"
+          PATCH_CMD="$PATCH_CMD --patches revanced-patches.rvp"
           PATCH_CMD="$PATCH_CMD --out youtube-revanced.apk"
           
           # Add include patches if specified
@@ -248,6 +241,7 @@ jobs:
 
       - name: Save patched APK
         run: |
+          # FIXED: Used steps.version.outputs.version instead of inputs.version
           cp youtube-revanced.apk apks/patched/youtube-revanced-${{ steps.version.outputs.version }}-arm64-v8a.apk
           echo "✅ Patched APK saved to apks/patched/"
 
@@ -257,7 +251,7 @@ jobs:
           # Build Information
           
           **Build Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          **YouTube Version:** ${{ github.event.inputs.version }}
+          **YouTube Version:** ${{ steps.version.outputs.version }}
           **Architecture:** arm64-v8a
           
           ## ReVanced Versions
@@ -288,7 +282,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs-${{ github.event.inputs.version }}
+          # FIXED: Used steps.version.outputs.version
+          name: build-logs-${{ steps.version.outputs.version }}
           path: logs/
           retention-days: 30
 
@@ -302,7 +297,8 @@ jobs:
           if git diff --staged --quiet; then
             echo "ℹ️  No changes to commit (APK already exists)"
           else
-            git commit -m "📦 Add YouTube v${{ github.event.inputs.version }} APKs
+            # FIXED: Used steps.version.outputs.version
+            git commit -m "📦 Add YouTube v${{ steps.version.outputs.version }} APKs
 
           - Original YouTube APK (arm64-v8a)
           - ReVanced patched APK
@@ -317,15 +313,16 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.event.inputs.version }}
-          name: YouTube ReVanced v${{ github.event.inputs.version }}
+          # FIXED: Used steps.version.outputs.version everywhere below
+          tag_name: v${{ steps.version.outputs.version }}
+          name: YouTube ReVanced v${{ steps.version.outputs.version }}
           body: |
-            ## YouTube ReVanced v${{ github.event.inputs.version }}
+            ## YouTube ReVanced v${{ steps.version.outputs.version }}
             
             Automated build of YouTube with ReVanced patches applied.
             
             ### 📦 Package Information
-            - **YouTube Version:** ${{ github.event.inputs.version }}
+            - **YouTube Version:** ${{ steps.version.outputs.version }}
             - **Architecture:** arm64-v8a
             - **Build Date:** ${{ github.run_id }}
             
@@ -337,7 +334,7 @@ jobs:
             - **youtube-*.apk** - Original unmodified APK
             
             ### 📱 Installation Instructions
-            1. Download `youtube-revanced-${{ github.event.inputs.version }}-arm64-v8a.apk`
+            1. Download `youtube-revanced-${{ steps.version.outputs.version }}-arm64-v8a.apk`
             2. Uninstall official YouTube app (if installed)
             3. Enable "Install from Unknown Sources" in Android settings
             4. Install the downloaded APK
@@ -352,8 +349,8 @@ jobs:
             - [ReVanced Documentation](https://revanced.app/)
             - [Supported Versions](https://github.com/revanced/revanced-patches#-list-of-available-patches)
           files: |
-            apks/original/youtube-${{ github.event.inputs.version }}-arm64-v8a.apk
-            apks/patched/youtube-revanced-${{ github.event.inputs.version }}-arm64-v8a.apk
+            apks/original/youtube-${{ steps.version.outputs.version }}-arm64-v8a.apk
+            apks/patched/youtube-revanced-${{ steps.version.outputs.version }}-arm64-v8a.apk
             apks/BUILD_INFO.md
           draft: false
           prerelease: false
