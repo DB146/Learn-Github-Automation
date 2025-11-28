@@ -287,29 +287,6 @@ jobs:
           path: logs/
           retention-days: 30
 
-      - name: Commit APKs to repository
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          
-          git add apks/
-          
-          if git diff --staged --quiet; then
-            echo "ℹ️  No changes to commit (APK already exists)"
-          else
-            # FIXED: Used steps.version.outputs.version
-            git commit -m "📦 Add YouTube v${{ steps.version.outputs.version }} APKs
-
-          - Original YouTube APK (arm64-v8a)
-          - ReVanced patched APK
-          
-          Built with:
-          $(cat versions.txt | sed 's/^/- /')
-          "
-            git push
-            echo "✅ APKs committed and pushed to repository"
-          fi
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
