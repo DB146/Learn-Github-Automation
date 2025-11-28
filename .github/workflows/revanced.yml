@@ -1,0 +1,204 @@
+name: YouTube ReVanced Auto-Patcher
+
+on:
+  workflow_dispatch: # Manual trigger
+  schedule:
+    - cron: '0 0 * * 0' # Runs weekly on Sunday at midnight UTC
+
+jobs:
+  patch-youtube:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget curl jq python3 python3-pip
+          pip3 install beautifulsoup4 requests lxml
+
+      - name: Create download script
+        run: |
+          cat > download_apk.py << 'EOF'
+          import requests
+          from bs4 import BeautifulSoup
+          import re
+          import sys
+
+          def get_latest_youtube_apk():
+              base_url = "https://www.apkmirror.com"
+              search_url = f"{base_url}/apk/google-inc/youtube/"
+              
+              headers = {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+              }
+              
+              try:
+                  # Get the main YouTube page
+                  response = requests.get(search_url, headers=headers)
+                  soup = BeautifulSoup(response.content, 'html.parser')
+                  
+                  # Find the latest version link
+                  version_links = soup.find_all('a', href=re.compile(r'/apk/google-inc/youtube/youtube-[\d\.]+-release/'))
+                  
+                  if not version_links:
+                      print("No version links found")
+                      sys.exit(1)
+                  
+                  latest_link = base_url + version_links[0]['href']
+                  print(f"Latest version page: {latest_link}")
+                  
+                  # Get the version page
+                  response = requests.get(latest_link, headers=headers)
+                  soup = BeautifulSoup(response.content, 'html.parser')
+                  
+                  # Find arm64-v8a variant
+                  variant_links = soup.find_all('a', href=re.compile(r'.*arm64-v8a.*'))
+                  
+                  arm64_link = None
+                  for link in variant_links:
+                      if 'arm64-v8a' in link.get('href', ''):
+                          arm64_link = base_url + link['href']
+                          break
+                  
+                  if not arm64_link:
+                      print("No arm64-v8a variant found")
+                      sys.exit(1)
+                  
+                  print(f"arm64-v8a variant page: {arm64_link}")
+                  
+                  # Get the download page
+                  response = requests.get(arm64_link, headers=headers)
+                  soup = BeautifulSoup(response.content, 'html.parser')
+                  
+                  # Find download button
+                  download_link = soup.find('a', {'class': 'downloadButton'})
+                  
+                  if not download_link:
+                      print("Download button not found")
+                      sys.exit(1)
+                  
+                  download_page = base_url + download_link['href']
+                  print(f"Download page: {download_page}")
+                  
+                  # Get final download link
+                  response = requests.get(download_page, headers=headers)
+                  soup = BeautifulSoup(response.content, 'html.parser')
+                  
+                  final_link = soup.find('a', href=re.compile(r'.*download.*key=.*'))
+                  
+                  if not final_link:
+                      print("Final download link not found")
+                      sys.exit(1)
+                  
+                  apk_url = base_url + final_link['href']
+                  print(f"DOWNLOAD_URL={apk_url}")
+                  
+                  # Extract version info
+                  version_match = re.search(r'youtube-([\d\.]+)-release', latest_link)
+                  if version_match:
+                      version = version_match.group(1)
+                      print(f"VERSION={version}")
+                  
+                  return apk_url
+              
+              except Exception as e:
+                  print(f"Error: {e}")
+                  sys.exit(1)
+
+          if __name__ == "__main__":
+              get_latest_youtube_apk()
+          EOF
+
+      - name: Get latest YouTube APK URL
+        id: get_apk
+        run: |
+          python3 download_apk.py > apk_info.txt
+          cat apk_info.txt
+          
+          DOWNLOAD_URL=$(grep "DOWNLOAD_URL=" apk_info.txt | cut -d'=' -f2-)
+          VERSION=$(grep "VERSION=" apk_info.txt | cut -d'=' -f2-)
+          
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download YouTube APK
+        run: |
+          wget -O youtube.apk "${{ steps.get_apk.outputs.download_url }}"
+          ls -lh youtube.apk
+
+      - name: Upload original APK to repository
+        run: |
+          mkdir -p apks/original
+          cp youtube.apk apks/original/youtube-${{ steps.get_apk.outputs.version }}-arm64-v8a.apk
+
+      - name: Download ReVanced tools
+        run: |
+          # Get latest ReVanced CLI
+          CLI_URL=$(curl -s https://api.github.com/repos/revanced/revanced-cli/releases/latest | jq -r '.assets[] | select(.name | endswith(".jar")) | .browser_download_url')
+          wget -O revanced-cli.jar "$CLI_URL"
+          
+          # Get latest ReVanced Patches
+          PATCHES_URL=$(curl -s https://api.github.com/repos/revanced/revanced-patches/releases/latest | jq -r '.assets[] | select(.name | endswith(".rvp")) | .browser_download_url')
+          wget -O revanced-patches.rvp "$PATCHES_URL"
+          
+          # Get latest ReVanced Integrations
+          INTEGRATIONS_URL=$(curl -s https://api.github.com/repos/revanced/revanced-integrations/releases/latest | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url')
+          wget -O revanced-integrations.apk "$INTEGRATIONS_URL"
+
+      - name: Patch YouTube APK with ReVanced
+        run: |
+          java -jar revanced-cli.jar patch \
+            --patch-bundle revanced-patches.rvp \
+            --merge revanced-integrations.apk \
+            --out youtube-revanced.apk \
+            youtube.apk
+
+      - name: Upload patched APK to repository
+        run: |
+          mkdir -p apks/patched
+          cp youtube-revanced.apk apks/patched/youtube-revanced-${{ steps.get_apk.outputs.version }}-arm64-v8a.apk
+
+      - name: Commit and push APKs
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          git add apks/
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update YouTube APK v${{ steps.get_apk.outputs.version }} and ReVanced patch"
+            git push
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_apk.outputs.version }}
+          name: YouTube ReVanced v${{ steps.get_apk.outputs.version }}
+          body: |
+            Automated build of YouTube ReVanced
+            
+            **Original APK Version:** ${{ steps.get_apk.outputs.version }}
+            **Build Date:** ${{ github.event.repository.updated_at }}
+            
+            Files included:
+            - Original YouTube APK (arm64-v8a)
+            - ReVanced Patched APK
+          files: |
+            apks/original/youtube-${{ steps.get_apk.outputs.version }}-arm64-v8a.apk
+            apks/patched/youtube-revanced-${{ steps.get_apk.outputs.version }}-arm64-v8a.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
