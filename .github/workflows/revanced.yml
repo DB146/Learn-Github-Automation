@@ -1,19 +1,40 @@
-name: YouTube ReVanced Auto-Patcher
+name: YouTube ReVanced Patcher
 
 on:
-  workflow_dispatch: # Manual trigger
-  schedule:
-    - cron: '0 0 * * 0' # Runs weekly on Sunday at midnight UTC
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: 'YouTube APK Download URL (from APKMirror or APKPure)'
+        required: false
+        type: string
+        default: ''
+      version:
+        description: 'YouTube Version (e.g., 19.16.39)'
+        required: true
+        type: string
+      include_patches:
+        description: 'Include specific patches (comma-separated, leave empty for recommended patches)'
+        required: false
+        type: string
+        default: ''
+      exclude_patches:
+        description: 'Exclude specific patches (comma-separated)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   patch-youtube:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -21,155 +42,205 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install dependencies
+      - name: Download or use existing YouTube APK
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget curl jq python3 python3-pip
-          pip3 install beautifulsoup4 requests lxml
-
-      - name: Create download script
-        run: |
-          cat > download_apk.py << 'EOF'
-          import requests
-          from bs4 import BeautifulSoup
-          import re
-          import sys
-
-          def get_latest_youtube_apk():
-              base_url = "https://www.apkmirror.com"
-              search_url = f"{base_url}/apk/google-inc/youtube/"
-              
-              headers = {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-              }
-              
-              try:
-                  # Get the main YouTube page
-                  response = requests.get(search_url, headers=headers)
-                  soup = BeautifulSoup(response.content, 'html.parser')
-                  
-                  # Find the latest version link
-                  version_links = soup.find_all('a', href=re.compile(r'/apk/google-inc/youtube/youtube-[\d\.]+-release/'))
-                  
-                  if not version_links:
-                      print("No version links found")
-                      sys.exit(1)
-                  
-                  latest_link = base_url + version_links[0]['href']
-                  print(f"Latest version page: {latest_link}")
-                  
-                  # Get the version page
-                  response = requests.get(latest_link, headers=headers)
-                  soup = BeautifulSoup(response.content, 'html.parser')
-                  
-                  # Find arm64-v8a variant
-                  variant_links = soup.find_all('a', href=re.compile(r'.*arm64-v8a.*'))
-                  
-                  arm64_link = None
-                  for link in variant_links:
-                      if 'arm64-v8a' in link.get('href', ''):
-                          arm64_link = base_url + link['href']
-                          break
-                  
-                  if not arm64_link:
-                      print("No arm64-v8a variant found")
-                      sys.exit(1)
-                  
-                  print(f"arm64-v8a variant page: {arm64_link}")
-                  
-                  # Get the download page
-                  response = requests.get(arm64_link, headers=headers)
-                  soup = BeautifulSoup(response.content, 'html.parser')
-                  
-                  # Find download button
-                  download_link = soup.find('a', {'class': 'downloadButton'})
-                  
-                  if not download_link:
-                      print("Download button not found")
-                      sys.exit(1)
-                  
-                  download_page = base_url + download_link['href']
-                  print(f"Download page: {download_page}")
-                  
-                  # Get final download link
-                  response = requests.get(download_page, headers=headers)
-                  soup = BeautifulSoup(response.content, 'html.parser')
-                  
-                  final_link = soup.find('a', href=re.compile(r'.*download.*key=.*'))
-                  
-                  if not final_link:
-                      print("Final download link not found")
-                      sys.exit(1)
-                  
-                  apk_url = base_url + final_link['href']
-                  print(f"DOWNLOAD_URL={apk_url}")
-                  
-                  # Extract version info
-                  version_match = re.search(r'youtube-([\d\.]+)-release', latest_link)
-                  if version_match:
-                      version = version_match.group(1)
-                      print(f"VERSION={version}")
-                  
-                  return apk_url
-              
-              except Exception as e:
-                  print(f"Error: {e}")
-                  sys.exit(1)
-
-          if __name__ == "__main__":
-              get_latest_youtube_apk()
-          EOF
-
-      - name: Get latest YouTube APK URL
-        id: get_apk
-        run: |
-          python3 download_apk.py > apk_info.txt
-          cat apk_info.txt
+          if [ -n "${{ github.event.inputs.apk_url }}" ]; then
+            echo "📥 Downloading APK from provided URL..."
+            wget --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
+                 --timeout=60 \
+                 --tries=3 \
+                 -O youtube.apk "${{ github.event.inputs.apk_url }}"
+            
+            if [ $? -eq 0 ] && [ -f youtube.apk ]; then
+              echo "✅ APK downloaded successfully"
+            else
+              echo "❌ Download failed!"
+              exit 1
+            fi
+          elif [ -f "youtube-source.apk" ]; then
+            echo "📦 Using youtube-source.apk from repository"
+            cp youtube-source.apk youtube.apk
+          elif [ -f "youtube.apk" ]; then
+            echo "📦 Using youtube.apk from repository"
+          else
+            echo "❌ ERROR: No APK source provided!"
+            echo ""
+            echo "Please either:"
+            echo "  1. Provide 'apk_url' input when running workflow"
+            echo "  2. Commit 'youtube-source.apk' or 'youtube.apk' to repository root"
+            exit 1
+          fi
           
-          DOWNLOAD_URL=$(grep "DOWNLOAD_URL=" apk_info.txt | cut -d'=' -f2-)
-          VERSION=$(grep "VERSION=" apk_info.txt | cut -d'=' -f2-)
-          
-          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Download YouTube APK
-        run: |
-          wget -O youtube.apk "${{ steps.get_apk.outputs.download_url }}"
+          echo ""
+          echo "📊 APK Info:"
           ls -lh youtube.apk
+          file youtube.apk
 
-      - name: Upload original APK to repository
+      - name: Verify APK integrity
+        run: |
+          echo "🔍 Verifying APK..."
+          
+          # Check if file is a valid ZIP (APK is a ZIP file)
+          if unzip -t youtube.apk > /dev/null 2>&1; then
+            echo "✅ APK file structure is valid"
+          else
+            echo "❌ APK file appears to be corrupted"
+            exit 1
+          fi
+
+      - name: Create directories
         run: |
           mkdir -p apks/original
-          cp youtube.apk apks/original/youtube-${{ steps.get_apk.outputs.version }}-arm64-v8a.apk
+          mkdir -p apks/patched
+          mkdir -p logs
+
+      - name: Save original APK
+        run: |
+          cp youtube.apk apks/original/youtube-${{ github.event.inputs.version }}-arm64-v8a.apk
+          echo "✅ Original APK saved to apks/original/"
 
       - name: Download ReVanced tools
         run: |
-          # Get latest ReVanced CLI
-          CLI_URL=$(curl -s https://api.github.com/repos/revanced/revanced-cli/releases/latest | jq -r '.assets[] | select(.name | endswith(".jar")) | .browser_download_url')
-          wget -O revanced-cli.jar "$CLI_URL"
+          echo "📥 Downloading ReVanced tools..."
+          echo ""
           
-          # Get latest ReVanced Patches
-          PATCHES_URL=$(curl -s https://api.github.com/repos/revanced/revanced-patches/releases/latest | jq -r '.assets[] | select(.name | endswith(".rvp")) | .browser_download_url')
-          wget -O revanced-patches.rvp "$PATCHES_URL"
+          echo "Fetching ReVanced CLI..."
+          CLI_URL=$(curl -s https://api.github.com/repos/revanced/revanced-cli/releases/latest | \
+                    jq -r '.assets[] | select(.name | endswith(".jar")) | .browser_download_url')
+          CLI_VERSION=$(curl -s https://api.github.com/repos/revanced/revanced-cli/releases/latest | jq -r '.tag_name')
+          echo "Version: $CLI_VERSION"
+          wget -q --show-progress -O revanced-cli.jar "$CLI_URL"
           
-          # Get latest ReVanced Integrations
-          INTEGRATIONS_URL=$(curl -s https://api.github.com/repos/revanced/revanced-integrations/releases/latest | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url')
-          wget -O revanced-integrations.apk "$INTEGRATIONS_URL"
+          echo ""
+          echo "Fetching ReVanced Patches..."
+          PATCHES_URL=$(curl -s https://api.github.com/repos/revanced/revanced-patches/releases/latest | \
+                        jq -r '.assets[] | select(.name | endswith(".rvp")) | .browser_download_url')
+          PATCHES_VERSION=$(curl -s https://api.github.com/repos/revanced/revanced-patches/releases/latest | jq -r '.tag_name')
+          echo "Version: $PATCHES_VERSION"
+          wget -q --show-progress -O revanced-patches.rvp "$PATCHES_URL"
+          
+          echo ""
+          echo "Fetching ReVanced Integrations..."
+          INTEGRATIONS_URL=$(curl -s https://api.github.com/repos/revanced/revanced-integrations/releases/latest | \
+                             jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url')
+          INTEGRATIONS_VERSION=$(curl -s https://api.github.com/repos/revanced/revanced-integrations/releases/latest | jq -r '.tag_name')
+          echo "Version: $INTEGRATIONS_VERSION"
+          wget -q --show-progress -O revanced-integrations.apk "$INTEGRATIONS_URL"
+          
+          echo ""
+          echo "✅ All ReVanced tools downloaded"
+          echo ""
+          echo "📊 Downloaded files:"
+          ls -lh revanced-cli.jar revanced-patches.rvp revanced-integrations.apk
+          
+          # Save versions to file
+          echo "CLI_VERSION=$CLI_VERSION" >> versions.txt
+          echo "PATCHES_VERSION=$PATCHES_VERSION" >> versions.txt
+          echo "INTEGRATIONS_VERSION=$INTEGRATIONS_VERSION" >> versions.txt
+
+      - name: List available patches
+        run: |
+          echo "📋 Available patches for YouTube:"
+          java -jar revanced-cli.jar list-patches \
+            --with-packages \
+            --with-versions \
+            revanced-patches.rvp | grep -i youtube | tee logs/available-patches.txt
 
       - name: Patch YouTube APK with ReVanced
         run: |
-          java -jar revanced-cli.jar patch \
-            --patch-bundle revanced-patches.rvp \
-            --merge revanced-integrations.apk \
-            --out youtube-revanced.apk \
-            youtube.apk
+          echo "🔧 Starting patching process..."
+          echo ""
+          
+          # Build patch command
+          PATCH_CMD="java -jar revanced-cli.jar patch"
+          PATCH_CMD="$PATCH_CMD --patch-bundle revanced-patches.rvp"
+          PATCH_CMD="$PATCH_CMD --merge revanced-integrations.apk"
+          PATCH_CMD="$PATCH_CMD --out youtube-revanced.apk"
+          
+          # Add include patches if specified
+          if [ -n "${{ github.event.inputs.include_patches }}" ]; then
+            echo "Including specific patches: ${{ github.event.inputs.include_patches }}"
+            IFS=',' read -ra PATCHES <<< "${{ github.event.inputs.include_patches }}"
+            for patch in "${PATCHES[@]}"; do
+              PATCH_CMD="$PATCH_CMD --include $(echo $patch | xargs)"
+            done
+          fi
+          
+          # Add exclude patches if specified
+          if [ -n "${{ github.event.inputs.exclude_patches }}" ]; then
+            echo "Excluding patches: ${{ github.event.inputs.exclude_patches }}"
+            IFS=',' read -ra PATCHES <<< "${{ github.event.inputs.exclude_patches }}"
+            for patch in "${PATCHES[@]}"; do
+              PATCH_CMD="$PATCH_CMD --exclude $(echo $patch | xargs)"
+            done
+          fi
+          
+          PATCH_CMD="$PATCH_CMD youtube.apk"
+          
+          echo "Command: $PATCH_CMD"
+          echo ""
+          
+          # Run patching
+          eval $PATCH_CMD 2>&1 | tee logs/patching.log
+          
+          if [ -f "youtube-revanced.apk" ]; then
+            echo ""
+            echo "✅ Patching successful!"
+            ls -lh youtube-revanced.apk
+          else
+            echo ""
+            echo "❌ Patching failed! Check logs/patching.log for details"
+            cat logs/patching.log
+            exit 1
+          fi
 
-      - name: Upload patched APK to repository
+      - name: Save patched APK
         run: |
-          mkdir -p apks/patched
-          cp youtube-revanced.apk apks/patched/youtube-revanced-${{ steps.get_apk.outputs.version }}-arm64-v8a.apk
+          cp youtube-revanced.apk apks/patched/youtube-revanced-${{ github.event.inputs.version }}-arm64-v8a.apk
+          echo "✅ Patched APK saved to apks/patched/"
 
-      - name: Commit and push APKs
+      - name: Generate build info
+        run: |
+          cat > apks/BUILD_INFO.md << EOF
+          # Build Information
+          
+          **Build Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **YouTube Version:** ${{ github.event.inputs.version }}
+          **Architecture:** arm64-v8a
+          
+          ## ReVanced Versions
+          $(cat versions.txt)
+          
+          ## Patch Configuration
+          EOF
+          
+          if [ -n "${{ github.event.inputs.include_patches }}" ]; then
+            echo "**Included Patches:** ${{ github.event.inputs.include_patches }}" >> apks/BUILD_INFO.md
+          else
+            echo "**Patches:** Default recommended patches" >> apks/BUILD_INFO.md
+          fi
+          
+          if [ -n "${{ github.event.inputs.exclude_patches }}" ]; then
+            echo "**Excluded Patches:** ${{ github.event.inputs.exclude_patches }}" >> apks/BUILD_INFO.md
+          fi
+          
+          echo "" >> apks/BUILD_INFO.md
+          echo "## Files" >> apks/BUILD_INFO.md
+          echo '```' >> apks/BUILD_INFO.md
+          ls -lh apks/original/ apks/patched/ >> apks/BUILD_INFO.md
+          echo '```' >> apks/BUILD_INFO.md
+          
+          cat apks/BUILD_INFO.md
+
+      - name: Upload logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.event.inputs.version }}
+          path: logs/
+          retention-days: 30
+
+      - name: Commit APKs to repository
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -177,28 +248,79 @@ jobs:
           git add apks/
           
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "ℹ️  No changes to commit (APK already exists)"
           else
-            git commit -m "Update YouTube APK v${{ steps.get_apk.outputs.version }} and ReVanced patch"
+            git commit -m "📦 Add YouTube v${{ github.event.inputs.version }} APKs
+
+          - Original YouTube APK (arm64-v8a)
+          - ReVanced patched APK
+          
+          Built with:
+          $(cat versions.txt | sed 's/^/- /')
+          "
             git push
+            echo "✅ APKs committed and pushed to repository"
           fi
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.get_apk.outputs.version }}
-          name: YouTube ReVanced v${{ steps.get_apk.outputs.version }}
+          tag_name: v${{ github.event.inputs.version }}
+          name: YouTube ReVanced v${{ github.event.inputs.version }}
           body: |
-            Automated build of YouTube ReVanced
+            ## YouTube ReVanced v${{ github.event.inputs.version }}
             
-            **Original APK Version:** ${{ steps.get_apk.outputs.version }}
-            **Build Date:** ${{ github.event.repository.updated_at }}
+            Automated build of YouTube with ReVanced patches applied.
             
-            Files included:
-            - Original YouTube APK (arm64-v8a)
-            - ReVanced Patched APK
+            ### 📦 Package Information
+            - **YouTube Version:** ${{ github.event.inputs.version }}
+            - **Architecture:** arm64-v8a
+            - **Build Date:** ${{ github.run_id }}
+            
+            ### 🔧 ReVanced Components
+            Built with latest ReVanced tools (check BUILD_INFO.md for exact versions)
+            
+            ### 📥 Downloads
+            - **youtube-revanced-*.apk** - Patched APK (recommended)
+            - **youtube-*.apk** - Original unmodified APK
+            
+            ### 📱 Installation Instructions
+            1. Download `youtube-revanced-${{ github.event.inputs.version }}-arm64-v8a.apk`
+            2. Uninstall official YouTube app (if installed)
+            3. Enable "Install from Unknown Sources" in Android settings
+            4. Install the downloaded APK
+            5. Sign in with your Google account
+            
+            ### ⚠️ Notes
+            - This is a modified version of YouTube
+            - Use at your own risk
+            - Not affiliated with Google or YouTube
+            
+            ### 🔗 Resources
+            - [ReVanced Documentation](https://revanced.app/)
+            - [Supported Versions](https://github.com/revanced/revanced-patches#-list-of-available-patches)
           files: |
-            apks/original/youtube-${{ steps.get_apk.outputs.version }}-arm64-v8a.apk
-            apks/patched/youtube-revanced-${{ steps.get_apk.outputs.version }}-arm64-v8a.apk
+            apks/original/youtube-${{ github.event.inputs.version }}-arm64-v8a.apk
+            apks/patched/youtube-revanced-${{ github.event.inputs.version }}-arm64-v8a.apk
+            apks/BUILD_INFO.md
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Summary
+        run: |
+          echo "## 🎉 Build Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Generated Files" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size | Location |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Original APK | $(ls -lh apks/original/*.apk | awk '{print $5}') | \`apks/original/\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Patched APK | $(ls -lh apks/patched/*.apk | awk '{print $5}') | \`apks/patched/\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- Check the [Releases](../../releases) page to download APKs" >> $GITHUB_STEP_SUMMARY
+          echo "- Review build logs in the Artifacts section" >> $GITHUB_STEP_SUMMARY
+          echo "- APKs are also committed to the \`apks/\` directory" >> $GITHUB_STEP_SUMMARY
