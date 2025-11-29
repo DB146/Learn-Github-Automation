@@ -141,7 +141,9 @@ jobs:
                   print("❌ Could not find a suitable 'nodpi' .apk variant.")
                   print("Debug - Available variants on page:")
                   for row in soup.find_all("div", class_="table-row"):
-                      print(f" - {row.get_text().strip().replace('\n', ' ')}")
+                      # Fixed: Perform string replacement outside f-string to avoid SyntaxError
+                      row_text = row.get_text().strip().replace('\n', ' ')
+                      print(f" - {row_text}")
                   sys.exit(1)
                   
               print(f"🔗 Variant Page: {found_url}")
@@ -196,7 +198,7 @@ jobs:
           
           # Run the python script
           python3 download_youtube.py
-
+          
       - name: Verify APK integrity
         id: version
         run: |
