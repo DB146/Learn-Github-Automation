@@ -78,112 +78,134 @@ jobs:
           if [ -n "${{ github.event.inputs.apk_url }}" ]; then
             echo "📥 Using provided APK URL..."
             APK_URL="${{ github.event.inputs.apk_url }}"
+            
+            # Download directly
+            wget --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+                 --timeout=120 \
+                 --tries=5 \
+                 --no-check-certificate \
+                 -O youtube.apk "$APK_URL"
           else
-            echo "🔍 Auto-detecting APK download URL for version $VERSION..."
+            echo "🔍 Auto-detecting and downloading APK from APKMirror for version $VERSION..."
             echo ""
             
-            # Try APKMirror first (most reliable for YouTube)
-            echo "Searching APKMirror..."
-            
             # Format version for URL (e.g., 20.14.43 -> 20-14-43)
-            VERSION_FORMATTED=$(echo "$VERSION" | sed 's/\./-/g')
+            VERSION_DASHED=$(echo "$VERSION" | sed 's/\./-/g')
             
-            # Construct APKMirror URL patterns to try
-            YEAR=$(date +%Y)
+            # Step 1: Find the APK page on APKMirror
+            echo "Step 1: Searching for YouTube $VERSION on APKMirror..."
             
-            # Try multiple APKMirror URL patterns
-            APK_URLS=(
-              "https://www.apkmirror.com/apk/google-inc/youtube/youtube-${VERSION}-release/youtube-${VERSION}-android-apk-download/"
-              "https://www.apkmirror.com/apk/google-inc/youtube/youtube-${VERSION}-release/youtube-${VERSION}-2-android-apk-download/"
-              "https://d.apkpure.com/b/XAPK/com.google.android.youtube?version=${VERSION}"
-              "https://d.apkpure.net/b/APK/com.google.android.youtube?versionCode=$(echo $VERSION | sed 's/\.//g')"
+            # Try common URL patterns for the APK page
+            APK_PAGE_URLS=(
+              "https://www.apkmirror.com/apk/google-inc/youtube/youtube-${VERSION_DASHED}-release/youtube-${VERSION_DASHED}-2-android-apk-download/"
+              "https://www.apkmirror.com/apk/google-inc/youtube/youtube-${VERSION_DASHED}-release/youtube-${VERSION_DASHED}-android-apk-download/"
+              "https://www.apkmirror.com/apk/google-inc/youtube/youtube-${VERSION_DASHED}-release/youtube-${VERSION_DASHED}-3-android-apk-download/"
             )
             
-            # For APKMirror, we need to construct the download URL differently
-            echo "Attempting to fetch download page from APKMirror..."
+            APK_PAGE=""
+            for url in "${APK_PAGE_URLS[@]}"; do
+              echo "Trying: $url"
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+              if [ "$HTTP_CODE" = "200" ]; then
+                APK_PAGE="$url"
+                echo "✅ Found APK page: $APK_PAGE"
+                break
+              fi
+            done
             
-            # Search APKMirror for the version
-            SEARCH_URL="https://www.apkmirror.com/?post_type=app_release&searchtype=apk&s=youtube+${VERSION}"
-            DOWNLOAD_PAGE=$(curl -sL "$SEARCH_URL" | \
-                           grep -o 'href="[^"]*youtube-'${VERSION}'[^"]*"' | \
+            if [ -z "$APK_PAGE" ]; then
+              echo "❌ Could not find APK page automatically"
+              echo ""
+              echo "Please manually find and provide the download URL:"
+              echo "1. Visit https://www.apkmirror.com/apk/google-inc/youtube/"
+              echo "2. Find version $VERSION"
+              echo "3. Copy the download page URL (the one with 'android-apk-download' in it)"
+              echo "4. Re-run this workflow with that URL in the apk_url field"
+              exit 1
+            fi
+            
+            # Step 2: Get the download page (with key parameter)
+            echo ""
+            echo "Step 2: Extracting download link from APK page..."
+            
+            DOWNLOAD_PAGE=$(curl -s "$APK_PAGE" | \
+                           grep -o 'href="[^"]*download/?key=[^"]*"' | \
                            head -1 | \
                            sed 's/href="//;s/"//')
             
-            if [ -n "$DOWNLOAD_PAGE" ]; then
-              echo "Found download page: https://www.apkmirror.com${DOWNLOAD_PAGE}"
-              
-              # Get the actual download link
-              APK_URL=$(curl -sL "https://www.apkmirror.com${DOWNLOAD_PAGE}" | \
-                       grep -o 'href="[^"]*key=[^"]*"' | \
-                       head -1 | \
-                       sed 's/href="//;s/"//')
-              
-              if [ -n "$APK_URL" ]; then
-                APK_URL="https://www.apkmirror.com${APK_URL}"
-                echo "✅ Found APK download URL: $APK_URL"
-              fi
-            fi
-            
-            # Fallback to APKPure if APKMirror fails
-            if [ -z "$APK_URL" ]; then
-              echo "⚠️  APKMirror detection failed, trying APKPure..."
-              
-              # Try APKPure direct download
-              APK_URL="https://d.apkpure.com/b/APK/com.google.android.youtube?version=${VERSION}"
-              
-              echo "Trying APKPure URL: $APK_URL"
-              
-              # Test if URL is valid
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$APK_URL")
-              if [ "$HTTP_CODE" != "200" ]; then
-                echo "❌ APKPure direct download failed"
-                APK_URL=""
-              fi
-            fi
-            
-            # If all auto-detection fails, provide manual instructions
-            if [ -z "$APK_URL" ]; then
-              echo "❌ Could not auto-detect APK download URL"
-              echo ""
-              echo "Please manually provide the APK URL by:"
-              echo "1. Visit https://www.apkmirror.com/apk/google-inc/youtube/"
-              echo "2. Find version $VERSION"
-              echo "3. Download the APK (choose arm64-v8a + armeabi-v7a variant)"
-              echo "4. Re-run this workflow with the download URL"
+            if [ -z "$DOWNLOAD_PAGE" ]; then
+              echo "❌ Could not extract download page URL"
+              echo "Please visit: $APK_PAGE"
+              echo "And manually get the download link"
               exit 1
             fi
+            
+            # Construct full download page URL
+            if [[ "$DOWNLOAD_PAGE" != http* ]]; then
+              DOWNLOAD_PAGE="https://www.apkmirror.com${DOWNLOAD_PAGE}"
+            fi
+            
+            echo "✅ Found download page: $DOWNLOAD_PAGE"
+            
+            # Step 3: Extract the final direct download link from the download page
+            echo ""
+            echo "Step 3: Getting direct download link..."
+            echo "Waiting for download page to load..."
+            sleep 3  # Small delay to respect APKMirror's rate limiting
+            
+            DIRECT_DOWNLOAD=$(curl -s "$DOWNLOAD_PAGE" | \
+                             grep -o 'href="[^"]*download\.php?id=[^"]*"' | \
+                             head -1 | \
+                             sed 's/href="//;s/"//')
+            
+            if [ -z "$DIRECT_DOWNLOAD" ]; then
+              echo "❌ Could not extract direct download URL"
+              echo "Please manually download from: $DOWNLOAD_PAGE"
+              exit 1
+            fi
+            
+            # Construct full direct download URL
+            if [[ "$DIRECT_DOWNLOAD" != http* ]]; then
+              DIRECT_DOWNLOAD="https://www.apkmirror.com${DIRECT_DOWNLOAD}"
+            fi
+            
+            echo "✅ Found direct download URL"
+            
+            # Step 4: Download the APK
+            echo ""
+            echo "Step 4: Downloading YouTube APK version $VERSION..."
+            
+            wget --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+                 --referer="$DOWNLOAD_PAGE" \
+                 --timeout=120 \
+                 --tries=5 \
+                 --no-check-certificate \
+                 -O youtube.apk "$DIRECT_DOWNLOAD"
+            
+            if [ $? -ne 0 ]; then
+              echo "❌ Download failed with wget, trying curl..."
+              curl -L --retry 5 --retry-delay 3 \
+                   -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
+                   -H "Referer: $DOWNLOAD_PAGE" \
+                   -o youtube.apk "$DIRECT_DOWNLOAD"
+            fi
           fi
           
-          echo ""
-          echo "📥 Downloading YouTube APK version $VERSION..."
-          echo "URL: $APK_URL"
-          echo ""
-          
-          # Download with better error handling
-          wget --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-               --timeout=120 \
-               --tries=5 \
-               --no-check-certificate \
-               -O youtube.apk "$APK_URL"
-          
-          if [ $? -ne 0 ]; then
-            echo "❌ Download failed with wget, trying curl..."
-            curl -L --retry 5 --retry-delay 3 \
-                 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
-                 -o youtube.apk "$APK_URL"
-          fi
-          
+          # Verify download
           if [ ! -f youtube.apk ] || [ ! -s youtube.apk ]; then
             echo "❌ Download failed or file is empty!"
             echo ""
             echo "Please manually download YouTube $VERSION APK from:"
-            echo "- APKMirror: https://www.apkmirror.com/apk/google-inc/youtube/"
-            echo "- APKPure: https://apkpure.com/youtube/com.google.android.youtube"
+            echo "https://www.apkmirror.com/apk/google-inc/youtube/"
             echo ""
-            echo "Then re-run this workflow with the download URL"
+            echo "Steps:"
+            echo "1. Search for version $VERSION"
+            echo "2. Download the APK (choose the variant with both arm64-v8a and armeabi-v7a)"
+            echo "3. Get the direct download link and re-run this workflow"
             exit 1
           fi
           
+          echo ""
           echo "✅ APK downloaded successfully"
           echo ""
           echo "📊 APK Info:"
