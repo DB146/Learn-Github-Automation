@@ -116,23 +116,32 @@ jobs:
               
               found_url = None
               
-              # Find variant: Must be APK (not Bundle) and arm64
+              # Loop through all rows to find the correct variant
+              # Criteria: APK (not Bundle) AND (arm64 OR universal) AND nodpi
               for row in soup.find_all("div", class_="table-row"):
-                  text = row.get_text()
-                  if "APK" in text and "arm64-v8a" in text:
-                      link_tag = row.find("a", class_="accent_color")
-                      if link_tag:
-                          current_url = base_url + link_tag['href']
-                          # Prioritize nodpi
-                          if "nodpi" in text:
-                              found_url = current_url
-                              print("✅ Found ideal APK (nodpi + arm64)")
+                  text = row.get_text().lower()
+                  
+                  # Must be APK, not a Bundle
+                  if "apk" in text and "bundle" not in text:
+                      
+                      # Check Architecture (arm64 or universal)
+                      is_arch_valid = "arm64" in text or "universal" in text
+                      
+                      # Check DPI (Must be nodpi for ReVanced)
+                      is_nodpi = "nodpi" in text
+                      
+                      if is_arch_valid and is_nodpi:
+                          link_tag = row.find("a", class_="accent_color")
+                          if link_tag:
+                              found_url = base_url + link_tag['href']
+                              print("✅ Found ideal APK: Universal/arm64 + nodpi")
                               break
-                          elif found_url is None:
-                              found_url = current_url # Fallback to first arm64 found
               
               if not found_url:
-                  print("❌ Could not find a suitable arm64 .apk variant.")
+                  print("❌ Could not find a suitable 'nodpi' .apk variant.")
+                  print("Debug - Available variants on page:")
+                  for row in soup.find_all("div", class_="table-row"):
+                      print(f" - {row.get_text().strip().replace('\n', ' ')}")
                   sys.exit(1)
                   
               print(f"🔗 Variant Page: {found_url}")
@@ -206,7 +215,6 @@ jobs:
           fi
           
           # Pass the version from the download step to this step's output
-          # so existing references to steps.version.outputs.version still work
           VERSION="${{ steps.download.outputs.version }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "✅ Validated APK Size: $(numfmt --to=iec $SIZE)"
