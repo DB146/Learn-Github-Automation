@@ -276,10 +276,11 @@ jobs:
           PATCH_CMD="$PATCH_CMD --patches revanced-patches.rvp"
           PATCH_CMD="$PATCH_CMD --out youtube-revanced.apk"
           
-          # 1. Handle Keystore (If secrets are provided)
+          # 🔐 KEYSTORE LOGIC STARTS HERE
           if [ -n "${{ secrets.KEYSTORE_FILE }}" ]; then
-            echo "🔐 Custom keystore detected. Importing..."
-            # Decode the base64 secret into a file
+            echo "🔐 Custom keystore detected. Using it for signing..."
+            
+            # Decode secret to file
             echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > user.keystore
             
             PATCH_CMD="$PATCH_CMD --keystore user.keystore"
@@ -288,21 +289,20 @@ jobs:
             PATCH_CMD="$PATCH_CMD --keystore-entry-password ${{ secrets.KEYSTORE_PASSWORD }}"
           else
             echo "⚠️ No custom keystore found in secrets."
-            echo "   Using default debug keystore. You will need to uninstall old versions to update."
+            echo "   Using temporary debug keystore. Updates will require reinstalling."
           fi
-
-          # 2. Add include patches
+          # 🔐 KEYSTORE LOGIC ENDS HERE
+          
+          # Add include patches
           if [ -n "${{ github.event.inputs.include_patches }}" ]; then
-            echo "Including specific patches: ${{ github.event.inputs.include_patches }}"
             IFS=',' read -ra PATCHES <<< "${{ github.event.inputs.include_patches }}"
             for patch in "${PATCHES[@]}"; do
               PATCH_CMD="$PATCH_CMD --include $(echo $patch | xargs)"
             done
           fi
           
-          # 3. Add exclude patches
+          # Add exclude patches
           if [ -n "${{ github.event.inputs.exclude_patches }}" ]; then
-            echo "Excluding patches: ${{ github.event.inputs.exclude_patches }}"
             IFS=',' read -ra PATCHES <<< "${{ github.event.inputs.exclude_patches }}"
             for patch in "${PATCHES[@]}"; do
               PATCH_CMD="$PATCH_CMD --exclude $(echo $patch | xargs)"
@@ -311,20 +311,11 @@ jobs:
           
           PATCH_CMD="$PATCH_CMD youtube.apk"
           
-          echo "Command: $PATCH_CMD"
-          echo ""
-          
-          # Run patching
+          echo "Running: $PATCH_CMD"
           eval $PATCH_CMD 2>&1 | tee logs/patching.log
           
-          if [ -f "youtube-revanced.apk" ]; then
-            echo ""
-            echo "✅ Patching successful!"
-            ls -lh youtube-revanced.apk
-          else
-            echo ""
-            echo "❌ Patching failed! Check logs/patching.log for details"
-            cat logs/patching.log
+          if [ ! -f "youtube-revanced.apk" ]; then
+            echo "❌ Patching failed!"
             exit 1
           fi
 
