@@ -276,7 +276,22 @@ jobs:
           PATCH_CMD="$PATCH_CMD --patches revanced-patches.rvp"
           PATCH_CMD="$PATCH_CMD --out youtube-revanced.apk"
           
-          # Add include patches if specified
+          # 1. Handle Keystore (If secrets are provided)
+          if [ -n "${{ secrets.KEYSTORE_FILE }}" ]; then
+            echo "🔐 Custom keystore detected. Importing..."
+            # Decode the base64 secret into a file
+            echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > user.keystore
+            
+            PATCH_CMD="$PATCH_CMD --keystore user.keystore"
+            PATCH_CMD="$PATCH_CMD --keystore-password ${{ secrets.KEYSTORE_PASSWORD }}"
+            PATCH_CMD="$PATCH_CMD --keystore-entry-alias ${{ secrets.KEYSTORE_ALIAS }}"
+            PATCH_CMD="$PATCH_CMD --keystore-entry-password ${{ secrets.KEYSTORE_PASSWORD }}"
+          else
+            echo "⚠️ No custom keystore found in secrets."
+            echo "   Using default debug keystore. You will need to uninstall old versions to update."
+          fi
+
+          # 2. Add include patches
           if [ -n "${{ github.event.inputs.include_patches }}" ]; then
             echo "Including specific patches: ${{ github.event.inputs.include_patches }}"
             IFS=',' read -ra PATCHES <<< "${{ github.event.inputs.include_patches }}"
@@ -285,7 +300,7 @@ jobs:
             done
           fi
           
-          # Add exclude patches if specified
+          # 3. Add exclude patches
           if [ -n "${{ github.event.inputs.exclude_patches }}" ]; then
             echo "Excluding patches: ${{ github.event.inputs.exclude_patches }}"
             IFS=',' read -ra PATCHES <<< "${{ github.event.inputs.exclude_patches }}"
