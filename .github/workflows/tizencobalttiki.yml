@@ -51,7 +51,7 @@ jobs:
           rm release.keystore.b64
           chmod 600 release.keystore
 
-        - name: Ensure zipalign present (fixed)
+      - name: Ensure zipalign present (fixed)
         run: |
           set -e
 
