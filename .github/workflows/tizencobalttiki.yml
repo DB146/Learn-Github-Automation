@@ -27,11 +27,18 @@ jobs:
         run: |
           curl -L "${{ steps.latest.outputs.result }}" -o cobalt.apk
 
-      - name: Install apktool
+      - name: Install apktool (fixed)
         run: |
-          wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
-          wget https://github.com/iBotPeaches/Apktool/releases/latest/download/apktool_2.9.3.jar -O apktool.jar
+          wget -O apktool https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
           chmod +x apktool
+
+          # Get the real latest jar download URL
+          JAR_URL=$(curl -s https://api.github.com/repos/iBotPeaches/Apktool/releases/latest \
+            | grep browser_download_url \
+            | grep jar \
+            | cut -d '"' -f 4)
+
+          wget -O apktool.jar "$JAR_URL"
 
       - name: Decompile apk
         run: |
