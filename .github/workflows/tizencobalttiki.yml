@@ -52,18 +52,52 @@ jobs:
         run: |
           ./apktool b cobalt_src -o rebuilt.apk
 
-      - name: Sign apk
+      - name: Restore signing keystore
         run: |
-          keytool -genkey \
-            -keystore keystore.jks \
-            -storepass pass123 \
-            -alias key \
-            -keypass pass123 \
-            -keyalg RSA \
-            -keysize 2048 \
-            -dname "CN=a"
-          jarsigner -keystore keystore.jks -storepass pass123 -keypass pass123 rebuilt.apk key
-          zipalign -f 4 rebuilt.apk cobalt-mod.apk
+          echo "${{ secrets.KEYSTORE_B64 }}" > release.keystore.b64
+          base64 -d release.keystore.b64 > release.keystore
+          rm release.keystore.b64
+          chmod 600 release.keystore
+
+      - name: Ensure zipalign present (try apt, fallback to sdkmanager)
+        run: |
+          set -e
+          if command -v zipalign >/dev/null 2>&1; then
+            echo "zipalign found"
+          else
+            sudo apt-get update
+            if apt-get install -y zipalign >/dev/null 2>&1; then
+              echo "installed zipalign from apt"
+            else
+              echo "Installing Android SDK build-tools fallback"
+              sudo apt-get install -y openjdk-11-jdk wget unzip
+              wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
+              unzip -q tools.zip -d cmdline-tools
+              mkdir -p $HOME/Android/cmdline-tools
+              mv cmdline-tools $HOME/Android/cmdline-tools/latest
+              export PATH="$PATH:$HOME/Android/cmdline-tools/latest/bin"
+              yes | sdkmanager --sdk_root=$HOME/Android "platform-tools" "build-tools;33.0.2"
+              export PATH="$PATH:$HOME/Android/build-tools/33.0.2"
+              # adjust path to build-tools; zipalign will be there
+            fi
+          fi
+
+      - name: Sign apk (use restored keystore)
+        run: |
+          jarsigner -keystore release.keystore \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -keypass "${{ secrets.KEY_PASSWORD }}" \
+            rebuilt.apk "${{ secrets.KEY_ALIAS }}"
+
+      - name: Align apk
+        run: |
+          if command -v zipalign >/dev/null 2>&1; then
+            zipalign -f 4 rebuilt.apk cobalt-mod.apk
+          else
+            # common path if build-tools installed at $HOME/Android/build-tools/<version>
+            ZIPALIGN="$(find $HOME/Android -type f -name zipalign -print -quit)"
+            "$ZIPALIGN" -f 4 rebuilt.apk cobalt-mod.apk
+          fi
 
       - name: Create release
         id: rel
