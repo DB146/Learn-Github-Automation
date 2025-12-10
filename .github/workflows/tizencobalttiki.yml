@@ -51,23 +51,36 @@ jobs:
           rm release.keystore.b64
           chmod 600 release.keystore
 
-      - name: Install Android build-tools (zipalign)
+        - name: Ensure zipalign present (fixed)
         run: |
+          set -e
+
+          if command -v zipalign >/dev/null 2>&1; then
+            exit 0
+          fi
+
           sudo apt-get update
-          sudo apt-get install -y openjdk-17-jdk wget unzip
+          if sudo apt-get install -y zipalign >/dev/null 2>&1; then
+            exit 0
+          fi
 
-          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
-          mkdir -p $HOME/android-sdk/cmdline-tools
-          unzip -q tools.zip -d $HOME/android-sdk/cmdline-tools
+          sudo apt-get install -y openjdk-11-jdk wget unzip
 
-          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          # Install command-line tools correctly (real structure)
+          mkdir -p $HOME/Android/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
+          unzip -q tools.zip
+          rm tools.zip
 
-          export ANDROID_HOME=$HOME/android-sdk
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+          # Move into proper layout so sdkmanager works
+          mv cmdline-tools $HOME/Android/cmdline-tools/latest
 
-          yes | sdkmanager --sdk_root=$ANDROID_HOME "build-tools;33.0.2"
+          echo "$HOME/Android/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
-          export PATH="$ANDROID_HOME/build-tools/33.0.2:$PATH"
+          yes | $HOME/Android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/Android \
+            "platform-tools" "build-tools;33.0.2"
+
+          echo "$HOME/Android/build-tools/33.0.2" >> $GITHUB_PATH
 
       - name: Sign apk
         run: |
