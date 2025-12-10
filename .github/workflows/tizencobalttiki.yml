@@ -1,0 +1,71 @@
+name: rebuild-cobalt
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest release metadata
+        id: latest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const res = await github.rest.repos.getLatestRelease({
+              owner: "reisxd",
+              repo: "TizenTubeCobalt"
+            });
+            return res.data.assets.find(a => a.name.endsWith(".apk")).browser_download_url;
+
+      - name: Download cobalt apk
+        run: |
+          curl -L "${{ steps.latest.outputs.result }}" -o cobalt.apk
+
+      - name: Install apktool
+        run: |
+          wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+          wget https://github.com/iBotPeaches/Apktool/releases/latest/download/apktool_2.9.3.jar -O apktool.jar
+          chmod +x apktool
+
+      - name: Decompile apk
+        run: |
+          ./apktool d cobalt.apk -o cobalt_src --force
+
+      - name: Change package name
+        run: |
+          sed -i 's/package="[^"]*"/package="com.teamsmart.videomanager.tv"/' cobalt_src/AndroidManifest.xml
+
+      - name: Recompile apk
+        run: |
+          ./apktool b cobalt_src -o rebuilt.apk
+
+      - name: Sign apk
+        run: |
+          keytool -genkey -keystore keystore.jks -storepass pass -alias key -keypass pass -dname "CN=a"
+          jarsigner -keystore keystore.jks -storepass pass -keypass pass rebuilt.apk key
+          zipalign -f 4 rebuilt.apk cobalt-mod.apk
+
+      - name: Create release
+        id: rel
+        uses: actions/create-release@v1
+        with:
+          tag_name: "auto-${{ github.run_id }}"
+          release_name: "auto-${{ github.run_id }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload apk
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.rel.outputs.upload_url }}
+          asset_path: cobalt-mod.apk
+          asset_name: cobalt-mod.apk
+          asset_content_type: application/vnd.android.package-archive
