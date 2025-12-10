@@ -27,30 +27,22 @@ jobs:
         run: |
           curl -L "${{ steps.latest.outputs.result }}" -o cobalt.apk
 
-      - name: Install apktool (fixed)
+      - name: Install apktool
         run: |
           wget -O apktool https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
           chmod +x apktool
-
-          # Get the real latest jar download URL
           JAR_URL=$(curl -s https://api.github.com/repos/iBotPeaches/Apktool/releases/latest \
-            | grep browser_download_url \
-            | grep jar \
-            | cut -d '"' -f 4)
-
+            | grep browser_download_url | grep jar | cut -d '"' -f 4)
           wget -O apktool.jar "$JAR_URL"
 
       - name: Decompile apk
-        run: |
-          ./apktool d cobalt.apk -o cobalt_src --force
+        run: ./apktool d cobalt.apk -o cobalt_src --force
 
       - name: Change package name
-        run: |
-          sed -i 's/package="[^"]*"/package="com.teamsmart.videomanager.tv"/' cobalt_src/AndroidManifest.xml
+        run: sed -i 's/package="[^"]*"/package="com.teamsmart.videomanager.tv"/' cobalt_src/AndroidManifest.xml
 
       - name: Recompile apk
-        run: |
-          ./apktool b cobalt_src -o rebuilt.apk
+        run: ./apktool b cobalt_src -o rebuilt.apk
 
       - name: Restore signing keystore
         run: |
@@ -59,30 +51,25 @@ jobs:
           rm release.keystore.b64
           chmod 600 release.keystore
 
-      - name: Ensure zipalign present (try apt, fallback to sdkmanager)
+      - name: Install Android build-tools (zipalign)
         run: |
-          set -e
-          if command -v zipalign >/dev/null 2>&1; then
-            echo "zipalign found"
-          else
-            sudo apt-get update
-            if apt-get install -y zipalign >/dev/null 2>&1; then
-              echo "installed zipalign from apt"
-            else
-              echo "Installing Android SDK build-tools fallback"
-              sudo apt-get install -y openjdk-11-jdk wget unzip
-              wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
-              unzip -q tools.zip -d cmdline-tools
-              mkdir -p $HOME/Android/cmdline-tools
-              mv cmdline-tools $HOME/Android/cmdline-tools/latest
-              export PATH="$PATH:$HOME/Android/cmdline-tools/latest/bin"
-              yes | sdkmanager --sdk_root=$HOME/Android "platform-tools" "build-tools;33.0.2"
-              export PATH="$PATH:$HOME/Android/build-tools/33.0.2"
-              # adjust path to build-tools; zipalign will be there
-            fi
-          fi
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk wget unzip
 
-      - name: Sign apk (use restored keystore)
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          unzip -q tools.zip -d $HOME/android-sdk/cmdline-tools
+
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "build-tools;33.0.2"
+
+          export PATH="$ANDROID_HOME/build-tools/33.0.2:$PATH"
+
+      - name: Sign apk
         run: |
           jarsigner -keystore release.keystore \
             -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
@@ -90,14 +77,7 @@ jobs:
             rebuilt.apk "${{ secrets.KEY_ALIAS }}"
 
       - name: Align apk
-        run: |
-          if command -v zipalign >/dev/null 2>&1; then
-            zipalign -f 4 rebuilt.apk cobalt-mod.apk
-          else
-            # common path if build-tools installed at $HOME/Android/build-tools/<version>
-            ZIPALIGN="$(find $HOME/Android -type f -name zipalign -print -quit)"
-            "$ZIPALIGN" -f 4 rebuilt.apk cobalt-mod.apk
-          fi
+        run: zipalign -f 4 rebuilt.apk cobalt-mod.apk
 
       - name: Create release
         id: rel
