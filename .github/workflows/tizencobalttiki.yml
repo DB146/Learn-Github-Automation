@@ -54,8 +54,8 @@ jobs:
 
       - name: Sign apk
         run: |
-          keytool -genkey -keystore keystore.jks -storepass pass -alias key -keypass pass -dname "CN=a"
-          jarsigner -keystore keystore.jks -storepass pass -keypass pass rebuilt.apk key
+          keytool -genkey -keystore keystore.jks -storepass pass123 -alias key -keypass pass123 -dname "CN=a"
+          jarsigner -keystore keystore.jks -storepass pass123 -keypass pass123 rebuilt.apk key
           zipalign -f 4 rebuilt.apk cobalt-mod.apk
 
       - name: Create release
