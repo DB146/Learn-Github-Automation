@@ -2,7 +2,7 @@ name: Auto Download and Update TV
 
 on:
   schedule:
-    - cron: "0 */6 * * *"   # Run every 6 hours
+    - cron: "0 0 * * 1,4"   
   workflow_dispatch:        # Allow manual trigger
 
 jobs:
