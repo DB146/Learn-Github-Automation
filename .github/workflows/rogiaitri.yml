@@ -10,8 +10,27 @@ jobs:
       - name: Scrape website and get APK download link
         id: scrape
         run: |
-          APK_URL=$(curl -s https://www.rophim.li/app-rophim | \
-            grep -oP 'https://static\.nutscdn\.com/download/apk/[^"'\'']*' | head -1)
+          # Use user-agent to avoid 403 errors
+          APK_URL=$(curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            https://www.rophim.li/app-rophim | \
+            grep -oE 'https://static\.nutscdn\.com/download/apk/[^"'\'' ]+' | head -1)
+          
+          # Fallback: try different patterns if first one fails
+          if [ -z "$APK_URL" ]; then
+            APK_URL=$(curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+              https://www.rophim.li/app-rophim | \
+              grep -oE 'static\.nutscdn\.com/download/apk/[^"'\'' ]+' | head -1)
+            if [ ! -z "$APK_URL" ]; then
+              APK_URL="https://$APK_URL"
+            fi
+          fi
+          
+          # Validate URL is not empty
+          if [ -z "$APK_URL" ]; then
+            echo "Error: Could not find APK URL"
+            exit 1
+          fi
+          
           echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
           echo "Found APK URL: $APK_URL"
       
