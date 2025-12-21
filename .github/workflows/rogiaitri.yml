@@ -7,23 +7,23 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install Tools
+      - name: Install Apktool
         run: |
-          sudo apt-get update
-          sudo apt-get install -y zipalign
-          # Download Apktool
           mkdir -p bin
           wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O bin/apktool
           JAR_URL=$(curl -s https://api.github.com/repos/iBotPeaches/Apktool/releases/latest | grep browser_download_url | grep jar | cut -d '"' -f 4)
@@ -31,18 +31,16 @@ jobs:
           chmod +x bin/apktool bin/apktool.jar
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
 
-      - name: Download and Decompile
+      - name: Download and Process APK
         run: |
+          # 1. Download original
           curl -L "${{ inputs.apk_url }}" -o original.apk
+          
+          # 2. Decompile (Strips old signature)
           apktool d original.apk -o src
-
-      - name: Change package name (Basic)
-        run: |
-          # Warning: This is still likely to cause app crashes without smali/res updates
-          sed -i 's/package="[^"]*"/package="com.rogiaitri.db146"/' src/AndroidManifest.xml
-
-      - name: Rebuild APK
-        run: apktool b src -o rebuilt_unaligned.apk
+          
+          # 3. Rebuild (Generates a clean, unsigned APK)
+          apktool b src -o rebuilt_unsigned.apk
 
       - name: Align and Sign APK
         env:
@@ -51,26 +49,31 @@ jobs:
           KEY_PASS: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          # Align
-          zipalign -v 4 rebuilt_unaligned.apk rebuilt_aligned.apk
+          # Find the latest build-tools on the runner
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          echo "Using Build Tools from: $BUILD_TOOLS_DIR"
           
-          # Decode Keystore
+          # 1. Align the unsigned APK
+          $BUILD_TOOLS_DIR/zipalign -v 4 rebuilt_unsigned.apk aligned.apk
+          
+          # 2. Decode Keystore
           echo "$KS_B64" | base64 -d > release.keystore
           
-          # Sign using apksigner (built-in to Ubuntu runners)
-          # We use a wildcard to find the latest build-tools version
-          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          # 3. Sign with new key (v2/v3 scheme)
           $BUILD_TOOLS_DIR/apksigner sign --ks release.keystore \
             --ks-pass pass:"$KS_PASS" \
             --key-pass pass:"$KEY_PASS" \
             --ks-key-alias "$KEY_ALIAS" \
-            --out final-mod.apk rebuilt_aligned.apk
+            --out rogiaitri-signed.apk aligned.apk
+          
+          # 4. Verify
+          $BUILD_TOOLS_DIR/apksigner verify rogiaitri-signed.apk
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: Create Release and Upload
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "rogiaitri-${{ github.run_id }}"
-          name: "RoGiaiTri For FPT Box"
-          files: final-mod.apk
+          name: "RoGiaiTri Rebuilt"
+          files: rogiaitri-signed.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
