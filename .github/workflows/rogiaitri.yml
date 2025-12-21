@@ -1,0 +1,94 @@
+name: rebuild-rogiaitri
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Scrape website and get APK download link
+        id: scrape
+        run: |
+          APK_URL=$(curl -s https://www.rophim.li/app-rophim | \
+            grep -oP 'https://static\.nutscdn\.com/download/apk/[^"'\'']*' | head -1)
+          echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
+          echo "Found APK URL: $APK_URL"
+      
+      - name: Download APK
+        run: |
+          curl -L "${{ steps.scrape.outputs.apk_url }}" -o rogiaitri.apk
+      
+      - name: Install apktool
+        run: |
+          wget -O apktool https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+          chmod +x apktool
+          JAR_URL=$(curl -s https://api.github.com/repos/iBotPeaches/Apktool/releases/latest \
+            | grep browser_download_url | grep jar | cut -d '"' -f 4)
+          wget -O apktool.jar "$JAR_URL"
+      
+      - name: Decompile APK
+        run: ./apktool d rogiaitri.apk -o rogiaitri_src --force
+      
+      - name: Change package name
+        run: sed -i 's/package="[^"]*"/package="com.rogiaitri.db146"/' rogiaitri_src/AndroidManifest.xml
+      
+      - name: Recompile APK
+        run: ./apktool b rogiaitri_src -o rebuilt.apk
+      
+      - name: Restore signing keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_B64 }}" > release.keystore.b64
+          base64 -d release.keystore.b64 > release.keystore
+          rm release.keystore.b64
+          chmod 600 release.keystore
+      
+      - name: Ensure zipalign present
+        run: |
+          set -e
+          if command -v zipalign >/dev/null 2>&1; then
+            exit 0
+          fi
+          sudo apt-get update
+          if sudo apt-get install -y zipalign >/dev/null 2>&1; then
+            exit 0
+          fi
+          sudo apt-get install -y openjdk-11-jdk wget unzip
+          mkdir -p $HOME/Android/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
+          unzip -q tools.zip
+          rm tools.zip
+          mv cmdline-tools $HOME/Android/cmdline-tools/latest
+          echo "$HOME/Android/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          yes | $HOME/Android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/Android \
+            "platform-tools" "build-tools;33.0.2"
+          echo "$HOME/Android/build-tools/33.0.2" >> $GITHUB_PATH
+      
+      - name: Sign APK
+        run: |
+          jarsigner -keystore release.keystore \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -keypass "${{ secrets.KEY_PASSWORD }}" \
+            rebuilt.apk "${{ secrets.KEY_ALIAS }}"
+      
+      - name: Align APK
+        run: zipalign -f 4 rebuilt.apk rogiaitri-mod.apk
+      
+      - name: Create release
+        id: rel
+        uses: actions/create-release@v1
+        with:
+          tag_name: "rogiaitri-${{ github.run_id }}"
+          release_name: "RoGiaiTri For FPT Box"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload APK
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.rel.outputs.upload_url }}
+          asset_path: rogiaitri-mod.apk
+          asset_name: rogiaitri-mod.apk
+          asset_content_type: application/vnd.android.package-archive
