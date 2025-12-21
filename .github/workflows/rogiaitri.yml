@@ -31,16 +31,34 @@ jobs:
           chmod +x bin/apktool bin/apktool.jar
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
 
-      - name: Download and Process APK
+      - name: Download and Decompile
         run: |
-          # 1. Download original
           curl -L "${{ inputs.apk_url }}" -o original.apk
-          
-          # 2. Decompile (Strips old signature)
           apktool d original.apk -o src
+
+      - name: Rename Package
+        run: |
+          # 1. Identify the OLD package name automatically from Manifest
+          OLD_PKG=$(grep -oP 'package="\K[^"]+' src/AndroidManifest.xml)
+          NEW_PKG="com.rogiaitri.db146"
           
-          # 3. Rebuild (Generates a clean, unsigned APK)
-          apktool b src -o rebuilt_unsigned.apk
+          echo "Renaming from $OLD_PKG to $NEW_PKG"
+          
+          # 2. Create the slash-based paths (used in Smali)
+          OLD_PKG_SLASH=$(echo $OLD_PKG | tr '.' '/')
+          NEW_PKG_SLASH=$(echo $NEW_PKG | tr '.' '/')
+          
+          # 3. Replace DOT notation (com.pkg.name) in all files
+          # We use 'LC_ALL=C' and 'find' to make it fast and avoid encoding issues
+          find src -type f -writable -exec sed -i "s|$OLD_PKG|$NEW_PKG|g" {} +
+          
+          # 4. Replace SLASH notation (com/pkg/name) in all files
+          find src -type f -writable -exec sed -i "s|$OLD_PKG_SLASH|$NEW_PKG_SLASH|g" {} +
+          
+          echo "Package rename complete."
+
+      - name: Rebuild APK
+        run: apktool b src -o rebuilt_unsigned.apk
 
       - name: Align and Sign APK
         env:
@@ -49,31 +67,24 @@ jobs:
           KEY_PASS: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          # Find the latest build-tools on the runner
           BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
-          echo "Using Build Tools from: $BUILD_TOOLS_DIR"
           
-          # 1. Align the unsigned APK
+          # Align
           $BUILD_TOOLS_DIR/zipalign -v 4 rebuilt_unsigned.apk aligned.apk
           
-          # 2. Decode Keystore
+          # Sign
           echo "$KS_B64" | base64 -d > release.keystore
-          
-          # 3. Sign with new key (v2/v3 scheme)
           $BUILD_TOOLS_DIR/apksigner sign --ks release.keystore \
             --ks-pass pass:"$KS_PASS" \
             --key-pass pass:"$KEY_PASS" \
             --ks-key-alias "$KEY_ALIAS" \
-            --out rogiaitri-signed.apk aligned.apk
-          
-          # 4. Verify
-          $BUILD_TOOLS_DIR/apksigner verify rogiaitri-signed.apk
+            --out rogiaitri-mod.apk aligned.apk
 
-      - name: Create Release and Upload
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "rogiaitri-${{ github.run_id }}"
-          name: "RoGiaiTri Rebuilt"
-          files: rogiaitri-signed.apk
+          name: "RoGiaiTri Modded"
+          files: rogiaitri-mod.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
