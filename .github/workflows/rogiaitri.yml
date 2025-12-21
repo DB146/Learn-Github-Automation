@@ -38,22 +38,28 @@ jobs:
 
       - name: Rename Package
         run: |
-          # 1. Identify the OLD package name automatically from Manifest
-          OLD_PKG=$(grep -oP 'package="\K[^"]+' src/AndroidManifest.xml)
+          # 1. Identify the OLD package name
+          OLD_PKG=$(grep -oP 'package="\K[^"]+' src/AndroidManifest.xml | head -1)
           NEW_PKG="com.rogiaitri.db146"
           
-          echo "Renaming from $OLD_PKG to $NEW_PKG"
+          echo "Original Package: $OLD_PKG"
+          echo "Target Package:   $NEW_PKG"
           
-          # 2. Create the slash-based paths (used in Smali)
+          # 2. Prepare Slash and Escaped Dot versions
           OLD_PKG_SLASH=$(echo $OLD_PKG | tr '.' '/')
           NEW_PKG_SLASH=$(echo $NEW_PKG | tr '.' '/')
           
-          # 3. Replace DOT notation (com.pkg.name) in all files
-          # We use 'LC_ALL=C' and 'find' to make it fast and avoid encoding issues
-          find src -type f -writable -exec sed -i "s|$OLD_PKG|$NEW_PKG|g" {} +
+          # This escapes the dots (e.g., com.old -> com\.old) so sed doesn't treat them as wildcards
+          OLD_PKG_ESC=$(echo $OLD_PKG | sed 's/\./\\./g')
           
-          # 4. Replace SLASH notation (com/pkg/name) in all files
-          find src -type f -writable -exec sed -i "s|$OLD_PKG_SLASH|$NEW_PKG_SLASH|g" {} +
+          echo "Replacing paths: $OLD_PKG_SLASH -> $NEW_PKG_SLASH"
+          echo "Replacing names: $OLD_PKG_ESC -> $NEW_PKG"
+
+          # 3. Replace SLASH notation in Smali and XML files (CRITICAL: Do this first)
+          find src -type f \( -name "*.smali" -o -name "*.xml" \) -exec sed -i "s|$OLD_PKG_SLASH|$NEW_PKG_SLASH|g" {} +
+          
+          # 4. Replace DOT notation everywhere else, using the escaped version
+          find src -type f -exec sed -i "s|$OLD_PKG_ESC|$NEW_PKG|g" {} +
           
           echo "Package rename complete."
 
