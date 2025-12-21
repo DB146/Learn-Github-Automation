@@ -1,42 +1,20 @@
 name: rebuild-rogiaitri
 on:
   workflow_dispatch:
+    inputs:
+      apk_url:
+        description: 'Direct APK download URL'
+        required: true
+        type: string
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Scrape website and get APK download link
-        id: scrape
-        run: |
-          # Use user-agent to avoid 403 errors
-          APK_URL=$(curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-            https://www.rophim.li/app-rophim | \
-            grep -oE 'https://static\.nutscdn\.com/download/apk/[^"'\'' ]+' | head -1)
-          
-          # Fallback: try different patterns if first one fails
-          if [ -z "$APK_URL" ]; then
-            APK_URL=$(curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-              https://www.rophim.li/app-rophim | \
-              grep -oE 'static\.nutscdn\.com/download/apk/[^"'\'' ]+' | head -1)
-            if [ ! -z "$APK_URL" ]; then
-              APK_URL="https://$APK_URL"
-            fi
-          fi
-          
-          # Validate URL is not empty
-          if [ -z "$APK_URL" ]; then
-            echo "Error: Could not find APK URL"
-            exit 1
-          fi
-          
-          echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
-          echo "Found APK URL: $APK_URL"
-      
       - name: Download APK
         run: |
-          curl -L "${{ steps.scrape.outputs.apk_url }}" -o rogiaitri.apk
+          curl -L "${{ inputs.apk_url }}" -o rogiaitri.apk
       
       - name: Install apktool
         run: |
