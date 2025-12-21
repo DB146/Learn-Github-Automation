@@ -6,100 +6,71 @@ on:
         description: 'Direct APK download URL'
         required: true
         type: string
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Download APK
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Tools
         run: |
-          curl -L "${{ inputs.apk_url }}" -o rogiaitri.apk
-      
-      - name: Install apktool
-        run: |
-          wget -O apktool https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
-          chmod +x apktool
-          JAR_URL=$(curl -s https://api.github.com/repos/iBotPeaches/Apktool/releases/latest \
-            | grep browser_download_url | grep jar | cut -d '"' -f 4)
-          wget -O apktool.jar "$JAR_URL"
-      
-      - name: Decompile APK
-        run: ./apktool d rogiaitri.apk -o rogiaitri_src --force
-      
-      - name: Change package name
-        run: |
-          # Change package name in AndroidManifest.xml
-          sed -i 's/package="[^"]*"/package="com.rogiaitri.db146"/' rogiaitri_src/AndroidManifest.xml
-          
-          # Also update package references in smali files if they exist
-          if [ -d "rogiaitri_src/smali" ]; then
-            find rogiaitri_src/smali* -type f -name "*.smali" 2>/dev/null | while read file; do
-              sed -i 's/L[^;]*;/Lcom\/rogiaitri\/db146;/g' "$file" 2>/dev/null || true
-            done
-          fi
-      
-      - name: Recompile APK
-        run: ./apktool b rogiaitri_src -o rebuilt.apk
-      
-      - name: Restore signing keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_B64 }}" > release.keystore.b64
-          base64 -d release.keystore.b64 > release.keystore
-          rm release.keystore.b64
-          chmod 600 release.keystore
-      
-      - name: Ensure zipalign present
-        run: |
-          set -e
-          if command -v zipalign >/dev/null 2>&1; then
-            exit 0
-          fi
           sudo apt-get update
-          if sudo apt-get install -y zipalign >/dev/null 2>&1; then
-            exit 0
-          fi
-          sudo apt-get install -y openjdk-11-jdk wget unzip
-          mkdir -p $HOME/Android/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
-          unzip -q tools.zip
-          rm tools.zip
-          mv cmdline-tools $HOME/Android/cmdline-tools/latest
-          echo "$HOME/Android/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          yes | $HOME/Android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/Android \
-            "platform-tools" "build-tools;33.0.2"
-          echo "$HOME/Android/build-tools/33.0.2" >> $GITHUB_PATH
-      
-      - name: Sign APK
+          sudo apt-get install -y zipalign
+          # Download Apktool
+          mkdir -p bin
+          wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O bin/apktool
+          JAR_URL=$(curl -s https://api.github.com/repos/iBotPeaches/Apktool/releases/latest | grep browser_download_url | grep jar | cut -d '"' -f 4)
+          wget -q "$JAR_URL" -O bin/apktool.jar
+          chmod +x bin/apktool bin/apktool.jar
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
+      - name: Download and Decompile
         run: |
-          # Sign the APK
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-            -keystore release.keystore \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -keypass "${{ secrets.KEY_PASSWORD }}" \
-            rebuilt.apk "${{ secrets.KEY_ALIAS }}"
+          curl -L "${{ inputs.apk_url }}" -o original.apk
+          apktool d original.apk -o src
+
+      - name: Change package name (Basic)
+        run: |
+          # Warning: This is still likely to cause app crashes without smali/res updates
+          sed -i 's/package="[^"]*"/package="com.rogiaitri.db146"/' src/AndroidManifest.xml
+
+      - name: Rebuild APK
+        run: apktool b src -o rebuilt_unaligned.apk
+
+      - name: Align and Sign APK
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          # Align
+          zipalign -v 4 rebuilt_unaligned.apk rebuilt_aligned.apk
           
-          # Verify the signature
-          jarsigner -verify -verbose rebuilt.apk
-      
-      - name: Align APK
-        run: zipalign -f 4 rebuilt.apk rogiaitri-mod.apk
-      
-      - name: Create release
-        id: rel
-        uses: actions/create-release@v1
+          # Decode Keystore
+          echo "$KS_B64" | base64 -d > release.keystore
+          
+          # Sign using apksigner (built-in to Ubuntu runners)
+          # We use a wildcard to find the latest build-tools version
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          $BUILD_TOOLS_DIR/apksigner sign --ks release.keystore \
+            --ks-pass pass:"$KS_PASS" \
+            --key-pass pass:"$KEY_PASS" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --out final-mod.apk rebuilt_aligned.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: "rogiaitri-${{ github.run_id }}"
-          release_name: "RoGiaiTri For FPT Box"
+          name: "RoGiaiTri For FPT Box"
+          files: final-mod.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload APK
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.rel.outputs.upload_url }}
-          asset_path: rogiaitri-mod.apk
-          asset_name: rogiaitri-mod.apk
-          asset_content_type: application/vnd.android.package-archive
