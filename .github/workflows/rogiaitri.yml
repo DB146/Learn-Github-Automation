@@ -28,7 +28,16 @@ jobs:
         run: ./apktool d rogiaitri.apk -o rogiaitri_src --force
       
       - name: Change package name
-        run: sed -i 's/package="[^"]*"/package="com.rogiaitri.db146"/' rogiaitri_src/AndroidManifest.xml
+        run: |
+          # Change package name in AndroidManifest.xml
+          sed -i 's/package="[^"]*"/package="com.rogiaitri.db146"/' rogiaitri_src/AndroidManifest.xml
+          
+          # Also update package references in smali files if they exist
+          if [ -d "rogiaitri_src/smali" ]; then
+            find rogiaitri_src/smali* -type f -name "*.smali" 2>/dev/null | while read file; do
+              sed -i 's/L[^;]*;/Lcom\/rogiaitri\/db146;/g' "$file" 2>/dev/null || true
+            done
+          fi
       
       - name: Recompile APK
         run: ./apktool b rogiaitri_src -o rebuilt.apk
@@ -63,10 +72,15 @@ jobs:
       
       - name: Sign APK
         run: |
-          jarsigner -keystore release.keystore \
+          # Sign the APK
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore release.keystore \
             -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
             -keypass "${{ secrets.KEY_PASSWORD }}" \
             rebuilt.apk "${{ secrets.KEY_ALIAS }}"
+          
+          # Verify the signature
+          jarsigner -verify -verbose rebuilt.apk
       
       - name: Align APK
         run: zipalign -f 4 rebuilt.apk rogiaitri-mod.apk
