@@ -6,6 +6,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -14,97 +16,51 @@ jobs:
         id: latest
         uses: actions/github-script@v7
         with:
+          result-encoding: string
           script: |
             const res = await github.rest.repos.getLatestRelease({
               owner: "reisxd",
               repo: "TizenTubeCobalt"
             });
-            return res.data.assets.find(a => a.name.endsWith("arm.apk")).browser_download_url;
+            const asset = res.data.assets.find(a => a.name.endsWith("arm.apk"));
+            return asset.browser_download_url;
 
-      - name: Download cobalt apk
+      - name: Download and Setup Tools
         run: |
           curl -L "${{ steps.latest.outputs.result }}" -o cobalt.apk
+          # Download Apktool
+          wget https://github.com/iBotPeaches/Apktool/releases/download/v2.9.3/apktool_2.9.3.jar -O apktool.jar
+          # Find build-tools path
+          BUILD_TOOLS_PATH=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          echo "BUILD_TOOLS_PATH=$BUILD_TOOLS_PATH" >> $GITHUB_ENV
 
-      - name: Install apktool
+      - name: Decompile and Patch
         run: |
-          wget -O apktool https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
-          chmod +x apktool
-          JAR_URL=$(curl -s https://api.github.com/repos/iBotPeaches/Apktool/releases/latest \
-            | grep browser_download_url | grep jar | cut -d '"' -f 4)
-          wget -O apktool.jar "$JAR_URL"
+          java -jar apktool.jar d cobalt.apk -o cobalt_src
+          # Update Manifest
+          sed -i 's/package="[^"]*"/package="com.teamsmart.videomanager.tv"/' cobalt_src/AndroidManifest.xml
+          # Update apktool.yml to match
+          sed -i 's/cur_package: .*/cur_package: com.teamsmart.videomanager.tv/' cobalt_src/apktool.yml
 
-      - name: Decompile apk
-        run: ./apktool d cobalt.apk -o cobalt_src --force
+      - name: Recompile
+        run: java -jar apktool.jar b cobalt_src -o rebuilt_unaligned.apk
 
-      - name: Change package name
-        run: sed -i 's/package="[^"]*"/package="com.teamsmart.videomanager.tv"/' cobalt_src/AndroidManifest.xml
+      - name: Zipalign
+        run: ${{ env.BUILD_TOOLS_PATH }}/zipalign -v 4 rebuilt_unaligned.apk rebuilt_aligned.apk
 
-      - name: Recompile apk
-        run: ./apktool b cobalt_src -o rebuilt.apk
-
-      - name: Restore signing keystore
+      - name: Sign APK (V2/V3)
         run: |
-          echo "${{ secrets.KEYSTORE_B64 }}" > release.keystore.b64
-          base64 -d release.keystore.b64 > release.keystore
-          rm release.keystore.b64
-          chmod 600 release.keystore
+          echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > release.keystore
+          ${{ env.BUILD_TOOLS_PATH }}/apksigner sign --ks release.keystore \
+            --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" \
+            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+            --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
+            --out cobalt-mod.apk rebuilt_aligned.apk
 
-      - name: Ensure zipalign present (fixed)
-        run: |
-          set -e
-
-          if command -v zipalign >/dev/null 2>&1; then
-            exit 0
-          fi
-
-          sudo apt-get update
-          if sudo apt-get install -y zipalign >/dev/null 2>&1; then
-            exit 0
-          fi
-
-          sudo apt-get install -y openjdk-11-jdk wget unzip
-
-          # Install command-line tools correctly (real structure)
-          mkdir -p $HOME/Android/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
-          unzip -q tools.zip
-          rm tools.zip
-
-          # Move into proper layout so sdkmanager works
-          mv cmdline-tools $HOME/Android/cmdline-tools/latest
-
-          echo "$HOME/Android/cmdline-tools/latest/bin" >> $GITHUB_PATH
-
-          yes | $HOME/Android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/Android \
-            "platform-tools" "build-tools;33.0.2"
-
-          echo "$HOME/Android/build-tools/33.0.2" >> $GITHUB_PATH
-
-      - name: Sign apk
-        run: |
-          jarsigner -keystore release.keystore \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -keypass "${{ secrets.KEY_PASSWORD }}" \
-            rebuilt.apk "${{ secrets.KEY_ALIAS }}"
-
-      - name: Align apk
-        run: zipalign -f 4 rebuilt.apk cobalt-mod.apk
-
-      - name: Create release
-        id: rel
-        uses: actions/create-release@v1
+      - name: Create Release and Upload
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: "auto-${{ github.run_id }}"
-          release_name: "auto-${{ github.run_id }}"
+          files: cobalt-mod.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload apk
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.rel.outputs.upload_url }}
-          asset_path: cobalt-mod.apk
-          asset_name: cobalt-mod.apk
-          asset_content_type: application/vnd.android.package-archive
