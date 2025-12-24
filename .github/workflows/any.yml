@@ -1,0 +1,76 @@
+name: generic-apk-rebuilder
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: 'Direct Download Link to APK'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Build Environment
+        run: |
+          # Download APK from input
+          curl -L "${{ github.event.inputs.apk_url }}" -o original.apk
+          
+          # Download Apktool
+          wget https://github.com/iBotPeaches/Apktool/releases/download/v2.9.3/apktool_2.9.3.jar -o apktool.jar
+          
+          # Locate Android Build Tools
+          BUILD_TOOLS_PATH=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          echo "BUILD_TOOLS_PATH=$BUILD_TOOLS_PATH" >> $GITHUB_ENV
+
+      - name: Decompile APK
+        run: java -jar apktool_2.9.3.jar d original.apk -o app_src
+
+      - name: Modify Package Name
+        run: |
+          # 1. Extract the current package name from apktool.yml
+          OLD_PKG=$(grep "cur_package" app_src/apktool.yml | cut -d' ' -f2 | tr -d "'\"")
+          NEW_PKG="${OLD_PKG}.test"
+          
+          echo "Original Package: $OLD_PKG"
+          echo "New Package: $NEW_PKG"
+          
+          # 2. Update AndroidManifest.xml
+          # We use a specific regex to only replace the main package definition
+          sed -i "s/package=\"$OLD_PKG\"/package=\"$NEW_PKG\"/" app_src/AndroidManifest.xml
+          
+          # 3. Update apktool.yml (important for recompilation metadata)
+          sed -i "s/cur_package: .*/cur_package: $NEW_PKG/" app_src/apktool.yml
+          
+          # Optional: rename provider authorities to prevent install conflicts
+          # sed -i "s/$OLD_PKG.fileprovider/$NEW_PKG.fileprovider/g" app_src/AndroidManifest.xml
+
+      - name: Rebuild APK
+        run: java -jar apktool_2.9.3.jar b app_src -o rebuilt_unaligned.apk
+
+      - name: Zipalign APK
+        run: ${{ env.BUILD_TOOLS_PATH }}/zipalign -v 4 rebuilt_unaligned.apk rebuilt_aligned.apk
+
+      - name: Sign APK (V2/V3)
+        run: |
+          echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > release.keystore
+          ${{ env.BUILD_TOOLS_PATH }}/apksigner sign --ks release.keystore \
+            --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" \
+            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+            --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
+            --out modified-app.apk rebuilt_aligned.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "mod-${{ github.run_id }}"
+          name: "Modified APK (Suffix .test)"
+          files: modified-app.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
