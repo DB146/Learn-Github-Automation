@@ -19,7 +19,7 @@ jobs:
               owner: "reisxd",
               repo: "TizenTubeCobalt"
             });
-            return res.data.assets.find(a => a.name.endsWith("64.apk")).browser_download_url;
+            return res.data.assets.find(a => a.name.endsWith("arm.apk")).browser_download_url;
 
       - name: Download cobalt apk
         run: |
