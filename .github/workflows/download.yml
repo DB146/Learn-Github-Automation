@@ -101,5 +101,5 @@ jobs:
           files: ${{ steps.download_step.outputs.filename }}
           prerelease: ${{ inputs.prerelease }}
           draft: false
-        env:
-          GITHU
+          env:
+            GITHUB
