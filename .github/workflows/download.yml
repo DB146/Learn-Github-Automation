@@ -1,0 +1,105 @@
+name: Download and Release APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: 'Direct download link to APK file'
+        required: true
+        type: string
+      release_tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+      release_name:
+        description: 'Release name'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  download-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download APK
+        id: download_step
+        run: |
+          echo "Downloading APK from: ${{ inputs.apk_url }}"
+          
+          # -J: Use remote header name (Content-Disposition)
+          # -L: Follow redirects
+          # -O: Use remote filename
+          curl -JLO "${{ inputs.apk_url }}"
+          
+          # Find the downloaded file. 
+          # We assume it is the only .apk in the root directory.
+          FILE_NAME=$(ls *.apk | head -n 1)
+          
+          if [ -z "$FILE_NAME" ]; then
+            echo "Error: No APK file found after download."
+            exit 1
+          fi
+          
+          echo "Downloaded file: $FILE_NAME"
+          
+          # Output the filename for subsequent steps
+          echo "filename=$FILE_NAME" >> $GITHUB_OUTPUT
+          
+          # Verify size
+          file_size=$(stat -c%s "$FILE_NAME")
+          if [ "$file_size" -lt 1000 ]; then
+            echo "Error: File is too small ($file_size bytes)."
+            exit 1
+          fi
+
+      - name: Get APK info
+        id: apk_info
+        run: |
+          FILE_NAME="${{ steps.download_step.outputs.filename }}"
+          
+          # Get file size in MB
+          file_size=$(stat -c%s "$FILE_NAME")
+          size_mb=$(echo "scale=2; $file_size / 1048576" | bc)
+          echo "size_mb=$size_mb" >> $GITHUB_OUTPUT
+          
+          # Get Checksums
+          md5sum=$(md5sum "$FILE_NAME" | awk '{print $1}')
+          echo "md5=$md5sum" >> $GITHUB_OUTPUT
+          
+          sha256sum=$(sha256sum "$FILE_NAME" | awk '{print $1}')
+          echo "sha256=$sha256sum" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: ${{ inputs.release_name }}
+          body: |
+            ## APK Release
+            
+            **File Name:** `${{ steps.download_step.outputs.filename }}`
+            **Download Source:** ${{ inputs.apk_url }}
+            **File Size:** ${{ steps.apk_info.outputs.size_mb }} MB
+            
+            ### Checksums
+            - **MD5:** `${{ steps.apk_info.outputs.md5 }}`
+            - **SHA256:** `${{ steps.apk_info.outputs.sha256 }}`
+            
+            ---
+            *This release was automatically created via GitHub Actions*
+          # This tells the action to pick up the specific file we downloaded
+          files: ${{ steps.download_step.outputs.filename }}
+          prerelease: ${{ inputs.prerelease }}
+          draft: false
+        env:
+          GITHU
