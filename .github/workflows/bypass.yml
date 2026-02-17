@@ -1,0 +1,38 @@
+name: Update Userscript Mirror
+
+on:
+  schedule:
+    # Runs at 00:00 UTC every Sunday (once every 7 days)
+    - cron: '0 0 * * 0'
+  workflow_dispatch: # Still allows you to run it manually anytime
+
+jobs:
+  update-script:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download userscript
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/gongchandang49/bypass-all-shortlinks-debloated/refs/heads/main/Bypass_All_Shortlinks.user.js" -o Bypass_All_Shortlinks.user.js
+
+      - name: Replace Codeberg URL with GitHub URL
+        run: |
+          sed -i 's|// @require.*codeberg.org/.*/MonkeyConfig-Mod.js|// @require    https://raw.githubusercontent.com/gongchandang49/bypass-all-shortlinks-debloated/refs/heads/main/MonkeyConfig-Mod.js|g' Bypass_All_Shortlinks.user.js
+
+      - name: Verify replacement
+        run: |
+          if grep -q "codeberg.org" Bypass_All_Shortlinks.user.js; then
+            echo "::error::Replacement failed! Codeberg URL still exists."
+            exit 1
+          fi
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: weekly update of Bypass_All_Shortlinks.user.js [$(date -u '+%Y-%m-%d')]"
+          file_pattern: 'Bypass_All_Shortlinks.user.js'
