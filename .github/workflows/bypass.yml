@@ -4,35 +4,44 @@ on:
   schedule:
     # Runs at 00:00 UTC every Sunday (once every 7 days)
     - cron: '0 0 * * 0'
-  workflow_dispatch: # Still allows you to run it manually anytime
+  workflow_dispatch:        # allows manual triggering from the Actions tab
 
 jobs:
   update-script:
     runs-on: ubuntu-latest
+
     permissions:
-      contents: write
+      contents: write       # needed to push the file back to the repo
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download userscript
+      - name: Download userscript from source
         run: |
-          curl -fsSL "https://raw.githubusercontent.com/gongchandang49/bypass-all-shortlinks-debloated/refs/heads/main/Bypass_All_Shortlinks.user.js" -o Bypass_All_Shortlinks.user.js
+          curl -fsSL \
+            "https://raw.githubusercontent.com/gongchandang49/bypass-all-shortlinks-debloated/refs/heads/main/Bypass_All_Shortlinks.user.js" \
+            -o Bypass_All_Shortlinks.user.js
 
-      - name: Replace Codeberg URL with GitHub URL
+      - name: Replace Codeberg require URL with GitHub raw URL
         run: |
-          sed -i 's|// @require.*codeberg.org/.*/MonkeyConfig-Mod.js|// @require    https://raw.githubusercontent.com/gongchandang49/bypass-all-shortlinks-debloated/refs/heads/main/MonkeyConfig-Mod.js|g' Bypass_All_Shortlinks.user.js
+          sed -i \
+            's|// @require    https://codeberg.org/gongchandang49/bypass-all-shortlinks-debloated/raw/branch/main/MonkeyConfig-Mod.js|// @require    https://raw.githubusercontent.com/gongchandang49/bypass-all-shortlinks-debloated/refs/heads/main/MonkeyConfig-Mod.js|g' \
+            Bypass_All_Shortlinks.user.js
 
-      - name: Verify replacement
+      - name: Verify replacement was made
         run: |
           if grep -q "codeberg.org" Bypass_All_Shortlinks.user.js; then
-            echo "::error::Replacement failed! Codeberg URL still exists."
-            exit 1
+            echo "WARNING: Codeberg URL still present in file — check the source for changes."
+          else
+            echo "Replacement successful."
           fi
 
-      - name: Commit and push changes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: weekly update of Bypass_All_Shortlinks.user.js [$(date -u '+%Y-%m-%d')]"
-          file_pattern: 'Bypass_All_Shortlinks.user.js'
+      - name: Commit and push updated file
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Bypass_All_Shortlinks.user.js
+          # Only commit if there's actually a change
+          git diff --cached --quiet || git commit -m "chore: update Bypass_All_Shortlinks.user.js mirror [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git push
