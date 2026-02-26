@@ -1,0 +1,101 @@
+name: Download and Release File
+
+on:
+  workflow_dispatch:
+    inputs:
+      direct_url:
+        description: 'Direct download link of the file'
+        required: true
+        type: string
+      tag_name:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+      release_name:
+        description: 'Release name'
+        required: true
+        type: string
+        default: 'Automated Download Release'
+
+jobs:
+  download-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # This permission is required to create a GitHub Release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download File
+        id: download
+        env:
+          DIRECT_URL: ${{ inputs.direct_url }}
+        run: |
+          # Create a clean directory for our download
+          mkdir -p download_dir
+          cd download_dir
+          
+          echo "Downloading from: $DIRECT_URL"
+          
+          # curl -L (follow redirects) -J (use server-provided filename) -O (save file)
+          curl -S -L -J -O "$DIRECT_URL"
+          
+          # Get the exact filename that was saved
+          FILENAME=$(ls -1 | head -n 1)
+          
+          # Pass the filename to the next steps via GITHUB_ENV
+          echo "filename=$FILENAME" >> $GITHUB_ENV
+          echo "Successfully downloaded: $FILENAME"
+
+      - name: Generate File Information (MD5, SHA256, Size)
+        id: info
+        env:
+          DIRECT_URL: ${{ inputs.direct_url }}
+        run: |
+          cd download_dir
+          FILE="${{ env.filename }}"
+          
+          # Calculate Sizes
+          SIZE_BYTES=$(stat -c%s "$FILE")
+          SIZE_HUMAN=$(ls -lh "$FILE" | awk '{print $5}')
+          
+          # Calculate Hashes
+          MD5_HASH=$(md5sum "$FILE" | awk '{print $1}')
+          SHA1_HASH=$(sha1sum "$FILE" | awk '{print $1}')
+          SHA256_HASH=$(sha256sum "$FILE" | awk '{print $1}')
+          
+          # Create the markdown template for the GitHub Release body
+          cat <<EOF > ../release_body.md
+          ## Release Information
+          
+          This file was automatically downloaded and packaged.
+          
+          - **Source URL:** [Direct Download Link]($DIRECT_URL)
+          - **Filename:** \`$FILE\`
+          - **File Size:** $SIZE_HUMAN ($SIZE_BYTES bytes)
+          
+          ### Security / Checksums
+          
+          | Hash Algorithm | Hash Value |
+          | --- | --- |
+          | **MD5** | \`$MD5_HASH\` |
+          | **SHA-1** | \`$SHA1_HASH\` |
+          | **SHA-256** | \`$SHA256_HASH\` |
+          EOF
+          
+          echo "Generated release notes:"
+          cat ../release_body.md
+
+      - name: Create GitHub Release and Upload Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ inputs.tag_name }}
+          RELEASE_NAME: ${{ inputs.release_name }}
+        run: |
+          cd download_dir
+          
+          # Use GitHub's official CLI (pre-installed on runners) to create the release
+          gh release create "$TAG_NAME" "${{ env.filename }}" \
+            --title "$RELEASE_NAME" \
+            --notes-file ../release_body.md
