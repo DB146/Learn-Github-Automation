@@ -636,7 +636,7 @@ jobs:
           DURATION=$DURATION
           EOF
 
-            printf "--- File %d ---\n" "$IDX"
+            printf -- "--- File %d ---\n" "$IDX"
             printf "  %-10s %s\n"            "File:"    "$FILENAME"
             printf "  %-10s %s\n"            "MIME:"    "$MIME"
             printf "  %-10s %s (%s bytes)\n" "Size:"    "$SIZE_HUMAN" "$SIZE_BYTES"
