@@ -1175,8 +1175,11 @@ jobs:
               data=json.dumps(payload).encode(),
               headers={"Content-Type": "application/json"},
               method="POST")
-          urllib.request.urlopen(req)
-          print("Discord notification sent.")
+          try:
+            urllib.request.urlopen(req)
+            print("Discord notification sent.")
+          except Exception as e:
+            print(f"::warning::Discord notification failed (release still succeeded): {e}")
           PYEOF
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
@@ -1218,8 +1221,11 @@ jobs:
               data=json.dumps(payload).encode(),
               headers={"Content-Type": "application/json"},
               method="POST")
-          urllib.request.urlopen(req)
-          print("Slack notification sent.")
+          try:
+            urllib.request.urlopen(req)
+            print("Slack notification sent.")
+          except Exception as e:
+            print(f"::warning::Slack notification failed (release still succeeded): {e}")
           PYEOF
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
@@ -1251,10 +1257,13 @@ jobs:
               "text":       text,
               "parse_mode": "Markdown"
           })
-          urllib.request.urlopen(
-              f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage?{params}"
-          )
-          print("Telegram notification sent.")
+          try:
+            urllib.request.urlopen(
+                f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage?{params}"
+            )
+            print("Telegram notification sent.")
+          except Exception as e:
+            print(f"::warning::Telegram notification failed (release still succeeded): {e}")
           PYEOF
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
