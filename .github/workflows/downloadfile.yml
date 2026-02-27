@@ -1,29 +1,30 @@
 name: Download, Artifact & Release
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Triggers: manual dispatch OR reusable workflow_call
+# Secrets used (configure in repo/org Settings → Secrets):
+#   DISCORD_WEBHOOK      — Discord incoming webhook URL
+#   SLACK_WEBHOOK        — Slack incoming webhook URL
+#   TELEGRAM_BOT_TOKEN   — Telegram bot token
+#   VIRUSTOTAL_API_KEY   — VirusTotal API key (free tier: 4 req/min)
+#
+# Triggers: manual workflow_dispatch  OR  reusable workflow_call
 # ──────────────────────────────────────────────────────────────────────────────
 on:
   workflow_dispatch:
     inputs:
+      # ── Required ───────────────────────────────────────────────────────────
       download_url:
         description: "Direct download URL(s) — comma-separated for multiple files"
         required: true
         type: string
+
+      # ── Release ────────────────────────────────────────────────────────────
       release_tag:
-        description: "Release tag (e.g. v1.0.0) — leave blank to auto-generate"
+        description: "Release tag (e.g. v1.0.0) — leave blank to auto-generate from date/time"
         required: false
         type: string
       release_name:
         description: "Release title (optional, defaults to tag)"
-        required: false
-        type: string
-      release_body_prefix:
-        description: "Custom text to prepend to the release description (optional)"
-        required: false
-        type: string
-      release_body_suffix:
-        description: "Custom text to append to the release description (optional)"
         required: false
         type: string
       prerelease:
@@ -43,62 +44,38 @@ on:
         default: false
 
       # ── Integrity & safety ─────────────────────────────────────────────────
-      expected_md5:
-        description: "Expected MD5 hash for integrity check (optional)"
-        required: false
-        type: string
-      expected_sha1:
-        description: "Expected SHA-1 hash for integrity check (optional)"
-        required: false
-        type: string
       expected_sha256:
-        description: "Expected SHA-256 hash for integrity check (optional)"
-        required: false
-        type: string
-      gpg_sig_url:
-        description: "URL of .sig/.asc GPG signature file to verify against (optional)"
-        required: false
-        type: string
-      gpg_public_key:
-        description: "ASCII-armored GPG public key for signature verification (optional)"
-        required: false
-        type: string
-      virustotal_api_key:
-        description: "VirusTotal API key for hash reputation lookup (optional)"
+        description: "Expected SHA-256 hash — verified against first file (optional)"
         required: false
         type: string
       max_size_mb:
-        description: "Reject download if file exceeds this size in MB (0 = no limit)"
+        description: "Reject if file exceeds this size in MB (0 = no limit)"
         required: false
         type: number
         default: 0
       allowed_mimes:
-        description: "Comma-separated MIME allowlist, e.g. application/zip,application/vnd.android.package-archive (blank = allow all)"
+        description: "Comma-separated MIME allowlist e.g. application/zip,application/vnd.android.package-archive (blank = allow all)"
         required: false
         type: string
 
-      # ── Download options ───────────────────────────────────────────────────
+      # ── Download ───────────────────────────────────────────────────────────
       file_rename:
-        description: "Override the saved filename (only applies when a single URL is given)"
+        description: "Override saved filename — only applies when a single URL is given"
         required: false
         type: string
       download_timeout_minutes:
-        description: "Max minutes to wait for the download before failing (0 = no limit)"
+        description: "Max minutes before download is aborted (0 = no limit)"
         required: false
         type: number
         default: 60
-      basic_auth_username:
-        description: "HTTP Basic Auth username (optional)"
-        required: false
-        type: string
-      basic_auth_password:
-        description: "HTTP Basic Auth password (optional)"
+      basic_auth:
+        description: "HTTP Basic Auth credentials as username:password (optional)"
         required: false
         type: string
 
       # ── Artifact ───────────────────────────────────────────────────────────
       artifact_retention_days:
-        description: "Artifact retention in days (1–90)"
+        description: "Actions artifact retention in days (1–90)"
         required: false
         type: number
         default: 90
@@ -109,20 +86,8 @@ on:
         default: false
 
       # ── Notifications ──────────────────────────────────────────────────────
-      discord_webhook_url:
-        description: "Discord webhook URL (optional)"
-        required: false
-        type: string
-      slack_webhook_url:
-        description: "Slack incoming webhook URL (optional)"
-        required: false
-        type: string
-      telegram_bot_token:
-        description: "Telegram bot token (optional)"
-        required: false
-        type: string
       telegram_chat_id:
-        description: "Telegram chat ID (required if telegram_bot_token is set)"
+        description: "Telegram chat ID to notify (requires TELEGRAM_BOT_TOKEN secret)"
         required: false
         type: string
 
@@ -136,19 +101,12 @@ on:
   workflow_call:
     inputs:
       download_url:
-        description: "Direct download URL(s) — comma-separated for multiple files"
         required: true
         type: string
       release_tag:
         required: false
         type: string
       release_name:
-        required: false
-        type: string
-      release_body_prefix:
-        required: false
-        type: string
-      release_body_suffix:
         required: false
         type: string
       prerelease:
@@ -163,22 +121,7 @@ on:
         required: false
         type: boolean
         default: false
-      expected_md5:
-        required: false
-        type: string
-      expected_sha1:
-        required: false
-        type: string
       expected_sha256:
-        required: false
-        type: string
-      gpg_sig_url:
-        required: false
-        type: string
-      gpg_public_key:
-        required: false
-        type: string
-      virustotal_api_key:
         required: false
         type: string
       max_size_mb:
@@ -195,10 +138,7 @@ on:
         required: false
         type: number
         default: 60
-      basic_auth_username:
-        required: false
-        type: string
-      basic_auth_password:
+      basic_auth:
         required: false
         type: string
       artifact_retention_days:
@@ -209,15 +149,6 @@ on:
         required: false
         type: boolean
         default: false
-      discord_webhook_url:
-        required: false
-        type: string
-      slack_webhook_url:
-        required: false
-        type: string
-      telegram_bot_token:
-        required: false
-        type: string
       telegram_chat_id:
         required: false
         type: string
@@ -225,6 +156,15 @@ on:
         required: false
         type: boolean
         default: false
+    secrets:
+      DISCORD_WEBHOOK:
+        required: false
+      SLACK_WEBHOOK:
+        required: false
+      TELEGRAM_BOT_TOKEN:
+        required: false
+      VIRUSTOTAL_API_KEY:
+        required: false
     outputs:
       release_url:
         description: "URL of the created GitHub Release"
@@ -232,9 +172,6 @@ on:
       release_tag:
         description: "Tag used for the release"
         value: ${{ jobs.download-and-release.outputs.release_tag }}
-      filenames:
-        description: "Space-separated list of downloaded filenames"
-        value: ${{ jobs.download-and-release.outputs.filenames }}
 
 jobs:
   download-and-release:
@@ -245,7 +182,6 @@ jobs:
     outputs:
       release_url: ${{ steps.release.outputs.url }}
       release_tag: ${{ steps.tag.outputs.tag }}
-      filenames:   ${{ steps.collect.outputs.filenames }}
 
     steps:
       # ── 1. Validate inputs ───────────────────────────────────────────────────
@@ -254,8 +190,8 @@ jobs:
           ERRORS=0
 
           RETENTION="${{ inputs.artifact_retention_days }}"
-          if [ -n "$RETENTION" ] && { [ "$RETENTION" -lt 1 ] || [ "$RETENTION" -gt 90 ]; } 2>/dev/null; then
-            echo "::error::artifact_retention_days must be between 1 and 90. Got: $RETENTION"
+          if [ -n "$RETENTION" ] && { [ "$RETENTION" -lt 1 ] 2>/dev/null || [ "$RETENTION" -gt 90 ] 2>/dev/null; }; then
+            echo "::error::artifact_retention_days must be 1–90. Got: $RETENTION"
             ERRORS=$((ERRORS+1))
           fi
 
@@ -271,22 +207,21 @@ jobs:
             ERRORS=$((ERRORS+1))
           fi
 
-          TG_TOKEN="${{ inputs.telegram_bot_token }}"
           TG_CHAT="${{ inputs.telegram_chat_id }}"
-          if [ -n "$TG_TOKEN" ] && [ -z "$TG_CHAT" ]; then
-            echo "::error::telegram_chat_id is required when telegram_bot_token is set."
+          TG_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
+          if [ -n "$TG_CHAT" ] && [ -z "$TG_TOKEN" ]; then
+            echo "::error::TELEGRAM_BOT_TOKEN secret is required when telegram_chat_id is set."
             ERRORS=$((ERRORS+1))
           fi
 
-          GPG_SIG="${{ inputs.gpg_sig_url }}"
-          GPG_KEY="${{ inputs.gpg_public_key }}"
-          if [ -n "$GPG_SIG" ] && [ -z "$GPG_KEY" ]; then
-            echo "::error::gpg_public_key is required when gpg_sig_url is provided."
+          BASIC_AUTH="${{ inputs.basic_auth }}"
+          if [ -n "$BASIC_AUTH" ] && ! echo "$BASIC_AUTH" | grep -q ':'; then
+            echo "::error::basic_auth must be in username:password format."
             ERRORS=$((ERRORS+1))
           fi
 
           if [ "$ERRORS" -gt 0 ]; then
-            echo "::error::$ERRORS input validation error(s). Aborting."
+            echo "::error::$ERRORS validation error(s). Aborting."
             exit 1
           fi
 
@@ -300,15 +235,22 @@ jobs:
           sudo freshclam --quiet || echo "::warning::ClamAV signature update failed — using existing definitions."
 
       # ── 3. Parse and validate URLs ───────────────────────────────────────────
+      # Fix 4: Use GET (not HEAD) for pre-flight — many hosts block HEAD requests.
+      # Fix 1: Pass Basic Auth credentials in pre-flight curl.
       - name: Parse and validate URLs
         id: urls
         run: |
           RAW="${{ inputs.download_url }}"
+          BASIC_AUTH="${{ inputs.basic_auth }}"
+
+          CURL_AUTH=""
+          [ -n "$BASIC_AUTH" ] && CURL_AUTH="--user $BASIC_AUTH"
+
           IFS=',' read -ra URL_ARRAY <<< "$RAW"
           COUNT=0
 
           for URL in "${URL_ARRAY[@]}"; do
-            URL=$(echo "$URL" | xargs)
+            URL=$(echo "$URL" | xargs)  # trim whitespace
 
             if [[ ! "$URL" =~ ^https?:// ]]; then
               echo "::error::URL must start with http:// or https://. Got: $URL"
@@ -319,14 +261,21 @@ jobs:
               echo "::warning::URL uses plain HTTP (unencrypted): $URL"
             fi
 
-            HTTP_CODE=$(curl -o /dev/null -sI -w "%{http_code}" --max-time 15 --location "$URL")
-            if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 400 ]; then
+            # Fix 4: Use GET with Range: bytes=0-0 instead of HEAD to avoid 405s
+            HTTP_CODE=$(curl -o /dev/null -s -w "%{http_code}" \
+              --max-time 15 --location \
+              -H "Range: bytes=0-0" \
+              $CURL_AUTH \
+              "$URL")
+
+            # 206 Partial Content is also a success for range requests
+            if [ "$HTTP_CODE" -lt 200 ] || { [ "$HTTP_CODE" -ge 400 ] && [ "$HTTP_CODE" -ne 206 ]; }; then
               echo "::error::Pre-flight check failed (HTTP $HTTP_CODE) for: $URL"
               exit 1
             fi
 
             COUNT=$((COUNT+1))
-            echo "$URL" >> /tmp/urls.txt
+            printf '%s\n' "$URL" >> /tmp/urls.txt
             echo "Pre-flight passed (HTTP $HTTP_CODE): $URL"
           done
 
@@ -334,22 +283,30 @@ jobs:
           echo "$COUNT URL(s) validated."
 
       # ── 4. Resolve filenames and detect source types ──────────────────────────
+      # Fix 1: Pass Basic Auth in header-fetch curl calls.
+      # Fix 2: Spaces in filenames are replaced with underscores.
+      # Fix 4: Use GET (not HEAD) for Content-Disposition header fetch.
       - name: Resolve filenames and detect source types
         id: resolve
         run: |
           FILE_RENAME="${{ inputs.file_rename }}"
+          BASIC_AUTH="${{ inputs.basic_auth }}"
           URL_COUNT="${{ steps.urls.outputs.url_count }}"
-          IDX=0
 
+          CURL_AUTH=""
+          [ -n "$BASIC_AUTH" ] && CURL_AUTH="--user $BASIC_AUTH"
+
+          IDX=0
           while IFS= read -r URL; do
             IDX=$((IDX+1))
             SOURCE_TYPE="generic"
             GDRIVE_ID=""
 
+            # Detect special sources
             if echo "$URL" | grep -qE "drive\.google\.com/(file/d/|open\?id=)"; then
               SOURCE_TYPE="gdrive"
               GDRIVE_ID=$(echo "$URL" | grep -oP '(?<=/d/)[^/]+|(?<=id=)[^&]+' | head -1)
-              echo "[$IDX] Google Drive detected. ID: $GDRIVE_ID"
+              echo "[$IDX] Google Drive. ID: $GDRIVE_ID"
             elif echo "$URL" | grep -qE "sourceforge\.net"; then
               SOURCE_TYPE="sourceforge"
               echo "[$IDX] SourceForge detected."
@@ -358,45 +315,56 @@ jobs:
               echo "[$IDX] .torrent file URL detected."
             fi
 
-            # Filename resolution
+            # ── Resolve filename ────────────────────────────────────────────
             if [ -n "$FILE_RENAME" ] && [ "$URL_COUNT" = "1" ]; then
               FILENAME="$FILE_RENAME"
               echo "[$IDX] Using user-provided filename: $FILENAME"
             else
-              FILENAME=$(
-                curl -sI --location "$URL" \
-                  | grep -i 'content-disposition' \
-                  | sed -n 's/.*filename[^;=\n]*=\s*["\x27]\?\([^"\x27;\r\n]*\).*/\1/Ip' \
-                  | tr -d '\r'
-              )
+              # Fix 4: Use GET with Range: bytes=0-0 to fetch headers without HEAD.
+              # -D- dumps headers to stdout; -o /dev/null discards the body.
+              # Falls back to a plain GET if the server rejects range requests.
+              HEADERS=$(curl -s -D- -o /dev/null --location --max-time 15 \
+                         -H "Range: bytes=0-0" \
+                         $CURL_AUTH "$URL" 2>/dev/null \
+                       || curl -s -D- -o /dev/null --location --max-time 15 \
+                         $CURL_AUTH "$URL" 2>/dev/null)
 
+              # 1) Standard Content-Disposition: filename="foo.apk"
+              FILENAME=$(echo "$HEADERS" \
+                | grep -i 'content-disposition' \
+                | sed -n 's/.*filename[^;=\n]*=\s*["\x27]\?\([^"\x27;\r\n]*\).*/\1/Ip' \
+                | tr -d '\r')
+
+              # 2) RFC 5987: filename*=UTF-8''foo%20bar.apk
               if [ -z "$FILENAME" ]; then
-                FILENAME=$(
-                  curl -sI --location "$URL" \
-                    | grep -i 'content-disposition' \
-                    | sed -n "s/.*filename\*=[Uu][Tt][Ff]-8''\([^;\r\n]*\).*/\1/Ip" \
-                    | python3 -c "import sys, urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))" \
-                    | tr -d '\r'
-                )
+                FILENAME=$(echo "$HEADERS" \
+                  | grep -i 'content-disposition' \
+                  | sed -n "s/.*filename\*=[Uu][Tt][Ff]-8''\([^;\r\n]*\).*/\1/Ip" \
+                  | python3 -c "import sys,urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))" \
+                  | tr -d '\r')
               fi
 
+              # 3) URL path basename (strip query string)
               if [ -z "$FILENAME" ]; then
                 FILENAME=$(basename "$(echo "$URL" | cut -d'?' -f1)")
               fi
 
+              # 4) Last-resort default
               FILENAME="${FILENAME:-downloaded_file_${IDX}}"
             fi
 
-            # Sanitize filename — strip chars illegal in GitHub Release assets
+            # ── Sanitize filename ────────────────────────────────────────────
+            # Fix 2: Also replace spaces with underscores
             ORIGINAL="$FILENAME"
-            FILENAME=$(echo "$FILENAME" | sed 's/[:<>"\\/|?*]/_/g' | tr -s '_')
+            FILENAME=$(echo "$FILENAME" | sed 's/[:<>"\\/|?* ]/_/g' | tr -s '_')
             if [ "$FILENAME" != "$ORIGINAL" ]; then
               echo "::warning::[$IDX] Filename sanitized: '$ORIGINAL' → '$FILENAME'"
             fi
 
             echo "$SOURCE_TYPE" > "/tmp/source_type_${IDX}.txt"
             echo "$GDRIVE_ID"   > "/tmp/gdrive_id_${IDX}.txt"
-            echo "$FILENAME"    > "/tmp/filename_${IDX}.txt"
+            # Fix 2: Write one filename per line — never space-delimited
+            printf '%s\n' "$FILENAME" >> /tmp/filenames.txt
             echo "[$IDX] Filename: $FILENAME | Source: $SOURCE_TYPE"
 
           done < /tmp/urls.txt
@@ -405,16 +373,17 @@ jobs:
       - name: Download files
         id: download
         run: |
-          AUTH_USER="${{ inputs.basic_auth_username }}"
-          AUTH_PASS="${{ inputs.basic_auth_password }}"
+          BASIC_AUTH="${{ inputs.basic_auth }}"
           TIMEOUT_MIN="${{ inputs.download_timeout_minutes }}"
           TIMEOUT_SEC=0
-          [ "$TIMEOUT_MIN" -gt 0 ] 2>/dev/null && TIMEOUT_SEC=$((TIMEOUT_MIN * 60))
+          [ -n "$TIMEOUT_MIN" ] && [ "$TIMEOUT_MIN" -gt 0 ] 2>/dev/null && TIMEOUT_SEC=$((TIMEOUT_MIN * 60))
 
           CURL_AUTH=""; ARIA_AUTH=""
-          if [ -n "$AUTH_USER" ] && [ -n "$AUTH_PASS" ]; then
-            CURL_AUTH="--user ${AUTH_USER}:${AUTH_PASS}"
-            ARIA_AUTH="--http-user=${AUTH_USER} --http-passwd=${AUTH_PASS}"
+          if [ -n "$BASIC_AUTH" ]; then
+            CURL_AUTH="--user $BASIC_AUTH"
+            ARIA_USER=$(echo "$BASIC_AUTH" | cut -d: -f1)
+            ARIA_PASS=$(echo "$BASIC_AUTH" | cut -d: -f2-)
+            ARIA_AUTH="--http-user=${ARIA_USER} --http-passwd=${ARIA_PASS}"
           fi
 
           CURL_TIMEOUT=""; ARIA_TIMEOUT=""
@@ -427,26 +396,30 @@ jobs:
           while IFS= read -r URL; do
             IDX=$((IDX+1))
             SOURCE_TYPE=$(cat "/tmp/source_type_${IDX}.txt")
-            FILENAME=$(cat "/tmp/filename_${IDX}.txt")
             GDRIVE_ID=$(cat "/tmp/gdrive_id_${IDX}.txt")
+            FILENAME=$(sed -n "${IDX}p" /tmp/filenames.txt)
 
             echo "=== [$IDX] Downloading: $FILENAME ==="
-            START_TIME=$(date +%s%N)
+            START_NS=$(date +%s%N)
 
             if [ "$SOURCE_TYPE" = "torrent" ]; then
+              # Download the .torrent descriptor, then fetch content via aria2c
               echo "Fetching .torrent descriptor..."
               curl -L --fail --retry 3 $CURL_TIMEOUT $CURL_AUTH \
                    -o "/tmp/file_${IDX}.torrent" "$URL"
-              echo "Downloading torrent content via aria2c (seed-time=0)..."
+
+              echo "Fetching torrent content (seed-time=0)..."
+              mkdir -p /tmp/torrent_dl_${IDX}
               aria2c \
-                --dir="$(pwd)" \
+                --dir="/tmp/torrent_dl_${IDX}" \
                 --seed-time=0 \
                 --max-tries=5 \
                 $ARIA_AUTH \
                 "/tmp/file_${IDX}.torrent"
-              # Rename the output file if it differs from resolved filename
-              DL_FILE=$(ls -t | grep -v '^checksums\|^metadata\|^release' | head -1)
-              [ "$DL_FILE" != "$FILENAME" ] && mv "$DL_FILE" "$FILENAME"
+
+              # Move the downloaded file to working dir with resolved filename
+              DL_FILE=$(find /tmp/torrent_dl_${IDX} -maxdepth 2 -type f | head -1)
+              mv "$DL_FILE" "./$FILENAME"
 
             elif [ "$SOURCE_TYPE" = "gdrive" ]; then
               CONFIRM=$(curl -sc /tmp/gdrive_cookies.txt $CURL_TIMEOUT \
@@ -455,11 +428,11 @@ jobs:
               if [ -n "$CONFIRM" ]; then
                 curl -Lb /tmp/gdrive_cookies.txt $CURL_TIMEOUT \
                   "https://drive.google.com/uc?export=download&confirm=${CONFIRM}&id=${GDRIVE_ID}" \
-                  -o "$FILENAME"
+                  -o "./$FILENAME"
               else
                 curl -L $CURL_TIMEOUT \
                   "https://drive.google.com/uc?export=download&id=${GDRIVE_ID}" \
-                  -o "$FILENAME"
+                  -o "./$FILENAME"
               fi
 
             elif [ "$SOURCE_TYPE" = "sourceforge" ]; then
@@ -468,10 +441,11 @@ jobs:
                    --location-trusted \
                    -b /tmp/cookies.txt -c /tmp/cookies.txt \
                    -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
-                   $CURL_AUTH -o "$FILENAME" "$URL"
+                   $CURL_AUTH \
+                   -o "./$FILENAME" "$URL"
 
             else
-              # Generic: aria2c (multi-connection + resume) with curl fallback
+              # Generic: aria2c multi-connection with resume, curl fallback with resume
               aria2c \
                 --split=8 \
                 --max-connection-per-server=8 \
@@ -491,42 +465,34 @@ jobs:
                      -b /tmp/cookies.txt -c /tmp/cookies.txt \
                      -A "Mozilla/5.0 (compatible; GitHub-Actions-Downloader/1.0)" \
                      $CURL_TIMEOUT $CURL_AUTH \
-                     -o "$FILENAME" "$URL"
+                     -o "./$FILENAME" "$URL"
               }
             fi
 
-            END_TIME=$(date +%s%N)
-            DURATION_SEC=$(echo "scale=2; $((END_TIME - START_TIME)) / 1000000 / 1000" | bc)
+            END_NS=$(date +%s%N)
+            DURATION_SEC=$(echo "scale=2; $((END_NS - START_NS)) / 1000000 / 1000" | bc)
             echo "$DURATION_SEC" > "/tmp/duration_${IDX}.txt"
 
-            # HTML-page guard
-            DETECTED_MIME=$(file --mime-type -b "$FILENAME")
-            if [[ "$DETECTED_MIME" == "text/html" ]]; then
-              echo "::error::[$IDX] Downloaded file is an HTML page — URL may need auth or has expired."
+            # Fix 5: HTML guard — only block if text/html is NOT in the allowlist
+            DETECTED_MIME=$(file --mime-type -b "./$FILENAME")
+            ALLOWED_MIMES="${{ inputs.allowed_mimes }}"
+            HTML_ALLOWED=false
+            IFS=',' read -ra MLIST <<< "$ALLOWED_MIMES"
+            for M in "${MLIST[@]}"; do
+              [ "$(echo "$M" | tr -d ' ')" = "text/html" ] && HTML_ALLOWED=true && break
+            done
+
+            if [[ "$DETECTED_MIME" == "text/html" ]] && [ "$HTML_ALLOWED" = "false" ]; then
+              echo "::error::[$IDX] Downloaded file is an HTML page. URL may need auth, use a landing page, or has expired."
               echo "--- First 500 bytes ---"
-              head -c 500 "$FILENAME"
+              head -c 500 "./$FILENAME"
               exit 1
             fi
 
-            echo "[$IDX] Done: $FILENAME in ${DURATION_SEC}s"
+            echo "[$IDX] Complete: $FILENAME in ${DURATION_SEC}s"
           done < /tmp/urls.txt
 
-      # ── 6. Collect filenames ─────────────────────────────────────────────────
-      - name: Collect filenames
-        id: collect
-        run: |
-          FILENAMES=""
-          IDX=0
-          while IFS= read -r URL; do
-            IDX=$((IDX+1))
-            F=$(cat "/tmp/filename_${IDX}.txt")
-            FILENAMES="$FILENAMES $F"
-          done < /tmp/urls.txt
-          FILENAMES=$(echo "$FILENAMES" | xargs)
-          echo "filenames=$FILENAMES" >> "$GITHUB_OUTPUT"
-          echo "Filenames: $FILENAMES"
-
-      # ── 7. Compute metadata ───────────────────────────────────────────────────
+      # ── 6. Compute metadata for all files ────────────────────────────────────
       - name: Compute metadata
         id: meta
         run: |
@@ -536,16 +502,16 @@ jobs:
 
           while IFS= read -r URL; do
             IDX=$((IDX+1))
-            FILE=$(cat "/tmp/filename_${IDX}.txt")
+            FILENAME=$(sed -n "${IDX}p" /tmp/filenames.txt)
             DURATION=$(cat "/tmp/duration_${IDX}.txt")
 
-            SIZE_BYTES=$(stat -c%s "$FILE")
+            SIZE_BYTES=$(stat -c%s "./$FILENAME")
             SIZE_HUMAN=$(numfmt --to=iec-i --suffix=B "$SIZE_BYTES")
-            MD5=$(md5sum       "$FILE" | awk '{print $1}')
-            SHA1=$(sha1sum     "$FILE" | awk '{print $1}')
-            SHA256=$(sha256sum "$FILE" | awk '{print $1}')
-            SHA512=$(sha512sum "$FILE" | awk '{print $1}')
-            MIME=$(file --mime-type -b "$FILE")
+            MD5=$(md5sum       "./$FILENAME" | awk '{print $1}')
+            SHA1=$(sha1sum     "./$FILENAME" | awk '{print $1}')
+            SHA256=$(sha256sum "./$FILENAME" | awk '{print $1}')
+            SHA512=$(sha512sum "./$FILENAME" | awk '{print $1}')
+            MIME=$(file --mime-type -b "./$FILENAME")
 
             if (( $(echo "$DURATION > 0" | bc -l) )); then
               SPEED_BPS=$(echo "scale=0; $SIZE_BYTES / $DURATION" | bc)
@@ -554,8 +520,9 @@ jobs:
               SPEED_HUMAN="N/A"
             fi
 
+            # Store as env file — one per file index
             cat > "/tmp/meta_${IDX}.env" <<EOF
-          FILE=$FILE
+          FILENAME=$FILENAME
           SIZE_BYTES=$SIZE_BYTES
           SIZE_HUMAN=$SIZE_HUMAN
           MD5=$MD5
@@ -567,22 +534,22 @@ jobs:
           DURATION=$DURATION
           EOF
 
-            echo "--- File $IDX ---"
-            printf "  %-10s %s\n" "File:"    "$FILE"
-            printf "  %-10s %s\n" "MIME:"    "$MIME"
-            printf "  %-10s %s (%s bytes)\n" "Size:"  "$SIZE_HUMAN" "$SIZE_BYTES"
-            printf "  %-10s %s\n" "Speed:"   "$SPEED_HUMAN"
-            printf "  %-10s %s\n" "MD5:"     "$MD5"
-            printf "  %-10s %s\n" "SHA-1:"   "$SHA1"
-            printf "  %-10s %s\n" "SHA-256:" "$SHA256"
-            printf "  %-10s %s\n" "SHA-512:" "$SHA512"
+            printf "--- File %d ---\n" "$IDX"
+            printf "  %-10s %s\n"           "File:"    "$FILENAME"
+            printf "  %-10s %s\n"           "MIME:"    "$MIME"
+            printf "  %-10s %s (%s bytes)\n" "Size:"   "$SIZE_HUMAN" "$SIZE_BYTES"
+            printf "  %-10s %s\n"           "Speed:"   "$SPEED_HUMAN"
+            printf "  %-10s %s\n"           "MD5:"     "$MD5"
+            printf "  %-10s %s\n"           "SHA-1:"   "$SHA1"
+            printf "  %-10s %s\n"           "SHA-256:" "$SHA256"
+            printf "  %-10s %s\n"           "SHA-512:" "$SHA512"
 
           done < /tmp/urls.txt
 
           echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
           echo "run_url=$RUN_URL"     >> "$GITHUB_OUTPUT"
 
-      # ── 8. Size and MIME checks ───────────────────────────────────────────────
+      # ── 7. File size and MIME type checks ────────────────────────────────────
       - name: Check file size and MIME type
         run: |
           MAX_MB="${{ inputs.max_size_mb }}"
@@ -596,7 +563,7 @@ jobs:
             if [ -n "$MAX_MB" ] && [ "$MAX_MB" != "0" ]; then
               MAX_BYTES=$(echo "$MAX_MB * 1048576" | bc)
               if (( SIZE_BYTES > MAX_BYTES )); then
-                echo "::error::[$IDX] $FILE size ($SIZE_HUMAN) exceeds limit of ${MAX_MB} MB."
+                echo "::error::[$IDX] $FILENAME: size ($SIZE_HUMAN) exceeds limit of ${MAX_MB} MB."
                 exit 1
               fi
               echo "[$IDX] Size OK: $SIZE_HUMAN ≤ ${MAX_MB} MB"
@@ -609,7 +576,7 @@ jobs:
                 [ "$(echo "$M" | tr -d ' ')" = "$MIME" ] && MATCH=true && break
               done
               if [ "$MATCH" = "false" ]; then
-                echo "::error::[$IDX] $FILE MIME '$MIME' not in allowlist: $ALLOWED"
+                echo "::error::[$IDX] $FILENAME: MIME '$MIME' not in allowlist: $ALLOWED"
                 exit 1
               fi
               echo "[$IDX] MIME OK: '$MIME' is allowed"
@@ -617,71 +584,44 @@ jobs:
 
           done < /tmp/urls.txt
 
-      # ── 9. Integrity checks (MD5, SHA-1, SHA-256) ────────────────────────────
-      - name: Verify integrity hashes
+      # ── 8. SHA-256 integrity check ────────────────────────────────────────────
+      # Fix 3: Clarify this applies to single-file runs; error if multi-URL + hash.
+      - name: Verify SHA-256 integrity
         run: |
-          EXP_MD5="${{ inputs.expected_md5 }}"
-          EXP_SHA1="${{ inputs.expected_sha1 }}"
-          EXP_SHA256="${{ inputs.expected_sha256 }}"
+          EXP="${{ inputs.expected_sha256 }}"
+          [ -z "$EXP" ] && echo "No expected hash — skipping." && exit 0
 
-          if [ -z "$EXP_MD5" ] && [ -z "$EXP_SHA1" ] && [ -z "$EXP_SHA256" ]; then
-            echo "No expected hashes provided — skipping."
-            exit 0
+          URL_COUNT=$(wc -l < /tmp/urls.txt)
+          if [ "$URL_COUNT" -gt 1 ]; then
+            echo "::error::expected_sha256 can only be used with a single URL. Got $URL_COUNT URLs."
+            exit 1
           fi
 
-          # Hash checks apply to first file only when multi-URL
           source "/tmp/meta_1.env"
-          FAILED=0
+          EXPECTED=$(echo "$EXP"    | tr '[:upper:]' '[:lower:]')
+          ACTUAL=$(echo   "$SHA256" | tr '[:upper:]' '[:lower:]')
 
-          check_hash() {
-            local ALGO="$1" EXPECTED="$2" ACTUAL="$3"
-            EXPECTED=$(echo "$EXPECTED" | tr '[:upper:]' '[:lower:]')
-            ACTUAL=$(echo "$ACTUAL"     | tr '[:upper:]' '[:lower:]')
-            if [ "$EXPECTED" != "$ACTUAL" ]; then
-              echo "::error::$ALGO check FAILED for $FILE"
-              echo "  Expected : $EXPECTED"
-              echo "  Actual   : $ACTUAL"
-              cat >> "$GITHUB_STEP_SUMMARY" <<SUMEOF
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::SHA-256 check FAILED for $FILENAME"
+            echo "  Expected : $EXPECTED"
+            echo "  Actual   : $ACTUAL"
+            cat >> "$GITHUB_STEP_SUMMARY" <<SUMEOF
 
-          ## ❌ $ALGO Integrity Check FAILED
+          ## ❌ SHA-256 Integrity Check FAILED
 
           | | Hash |
           |---|---|
           | **Expected** | \`$EXPECTED\` |
           | **Actual**   | \`$ACTUAL\` |
 
-          The file does not match the expected $ALGO hash. Release was **not** created.
+          The file does not match the expected SHA-256. Release was **not** created.
           SUMEOF
-              return 1
-            fi
-            echo "$ALGO check PASSED."
-          }
-
-          [ -n "$EXP_MD5"    ] && { check_hash "MD5"    "$EXP_MD5"    "$MD5"    || FAILED=$((FAILED+1)); }
-          [ -n "$EXP_SHA1"   ] && { check_hash "SHA-1"  "$EXP_SHA1"  "$SHA1"   || FAILED=$((FAILED+1)); }
-          [ -n "$EXP_SHA256" ] && { check_hash "SHA-256" "$EXP_SHA256" "$SHA256" || FAILED=$((FAILED+1)); }
-
-          [ "$FAILED" -gt 0 ] && exit 1 || true
-
-      # ── 10. GPG signature verification ───────────────────────────────────────
-      - name: Verify GPG signature
-        id: gpg
-        if: ${{ inputs.gpg_sig_url != '' && inputs.gpg_public_key != '' }}
-        run: |
-          source "/tmp/meta_1.env"
-          echo "${{ inputs.gpg_public_key }}" | gpg --import 2>&1
-          curl -L --fail --retry 3 -o /tmp/file.sig "${{ inputs.gpg_sig_url }}"
-
-          if gpg --verify /tmp/file.sig "$FILE" 2>&1; then
-            echo "gpg_status=✅ Signature valid" >> "$GITHUB_OUTPUT"
-            echo "GPG verification PASSED."
-          else
-            echo "gpg_status=❌ Signature INVALID" >> "$GITHUB_OUTPUT"
-            echo "::error::GPG verification FAILED for $FILE"
             exit 1
           fi
 
-      # ── 11. ClamAV virus scan ─────────────────────────────────────────────────
+          echo "SHA-256 check PASSED."
+
+      # ── 9. ClamAV virus scan ─────────────────────────────────────────────────
       - name: ClamAV virus scan
         id: clamav
         run: |
@@ -690,125 +630,144 @@ jobs:
 
           while IFS= read -r URL; do
             IDX=$((IDX+1))
-            FILE=$(cat "/tmp/filename_${IDX}.txt")
-            OUT=$(clamscan --no-summary "$FILE" 2>&1 || true)
+            FILENAME=$(sed -n "${IDX}p" /tmp/filenames.txt)
+            OUT=$(clamscan --no-summary "./$FILENAME" 2>&1 || true)
 
             if echo "$OUT" | grep -q "FOUND"; then
               DETAIL=$(echo "$OUT" | grep "FOUND")
-              echo "::warning::[$IDX] Threat in $FILE: $DETAIL"
-              SUMMARY="$SUMMARY [$IDX] ⚠️ $DETAIL |"
+              echo "::warning::[$IDX] Threat in $FILENAME: $DETAIL"
+              SUMMARY="${SUMMARY}[$IDX] ⚠️ ${DETAIL} | "
             else
-              SUMMARY="$SUMMARY [$IDX] ✅ Clean |"
+              SUMMARY="${SUMMARY}[$IDX] ✅ Clean | "
             fi
           done < /tmp/urls.txt
 
           echo "scan_summary=$SUMMARY" >> "$GITHUB_OUTPUT"
           echo "ClamAV: $SUMMARY"
 
-      # ── 12. VirusTotal hash lookup ────────────────────────────────────────────
+      # ── 10. VirusTotal hash lookup ────────────────────────────────────────────
+      # Fix 6: Sleep 16s between requests to respect free-tier 4 req/min limit.
       - name: VirusTotal hash lookup
         id: vt
-        if: ${{ inputs.virustotal_api_key != '' }}
+        if: ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
         run: |
-          VT_KEY="${{ inputs.virustotal_api_key }}"
           IDX=0
           SUMMARY=""
+          FIRST=true
 
           while IFS= read -r URL; do
             IDX=$((IDX+1))
             source "/tmp/meta_${IDX}.env"
 
-            RESPONSE=$(curl -s \
+            # Rate-limit: free tier = 4 req/min → wait 16s between calls
+            if [ "$FIRST" = "false" ]; then
+              echo "Sleeping 16s for VirusTotal rate limit..."
+              sleep 16
+            fi
+            FIRST=false
+
+            RESPONSE=$(curl -s --max-time 20 \
               --request GET \
               --url "https://www.virustotal.com/api/v3/files/${SHA256}" \
-              --header "x-apikey: ${VT_KEY}")
+              --header "x-apikey: ${{ secrets.VIRUSTOTAL_API_KEY }}")
 
             RESULT=$(echo "$RESPONSE" | python3 -c "
           import sys, json
           try:
             d = json.load(sys.stdin)
-            stats = d['data']['attributes']['last_analysis_stats']
-            mal  = stats.get('malicious', 0)
-            sus  = stats.get('suspicious', 0)
-            tot  = sum(stats.values())
-            fid  = d['data']['id']
-            link = f'https://www.virustotal.com/gui/file/{fid}'
-            flag = '⚠️' if mal > 0 or sus > 0 else '✅'
-            print(f'{flag} {mal} malicious / {sus} suspicious of {tot} — {link}')
-          except:
-            print('— Not found in VirusTotal (may be new/unknown)')
+            if 'error' in d:
+                code = d['error'].get('code','')
+                if code == 'NotFoundError':
+                    print('— Not found (file may be new/unknown)')
+                elif code == 'QuotaExceededError':
+                    print('⚠️ VT quota exceeded')
+                else:
+                    print(f'— VT error: {code}')
+            else:
+                stats = d['data']['attributes']['last_analysis_stats']
+                mal  = stats.get('malicious', 0)
+                sus  = stats.get('suspicious', 0)
+                tot  = sum(stats.values())
+                fid  = d['data']['id']
+                link = f'https://www.virustotal.com/gui/file/{fid}'
+                flag = '⚠️' if (mal > 0 or sus > 0) else '✅'
+                print(f'{flag} {mal} malicious / {sus} suspicious of {tot} — {link}')
+          except Exception as e:
+            print(f'— VT parse error: {e}')
           " 2>/dev/null || echo "— VT lookup failed")
 
-            echo "[$IDX] $FILE → $RESULT"
-            echo "$RESULT" > "/tmp/vt_${IDX}.txt"
-            SUMMARY="$SUMMARY [$IDX] $RESULT |"
+            echo "[$IDX] $FILENAME: $RESULT"
+            printf '%s\n' "$RESULT" > "/tmp/vt_${IDX}.txt"
+            SUMMARY="${SUMMARY}[$IDX] ${RESULT} | "
 
           done < /tmp/urls.txt
 
           echo "vt_summary=$SUMMARY" >> "$GITHUB_OUTPUT"
 
-      # ── 13. Generate checksums.txt ────────────────────────────────────────────
+      # ── 11. Generate checksums.txt ────────────────────────────────────────────
       - name: Generate checksums.txt
-        id: checksums
         run: |
-          OUT="checksums.txt"
           {
             echo "# Checksums generated : ${{ steps.meta.outputs.timestamp }}"
             echo "# Workflow run        : ${{ steps.meta.outputs.run_url }}"
             echo ""
-          } > "$OUT"
+          } > checksums.txt
 
           IDX=0
           while IFS= read -r URL; do
             IDX=$((IDX+1))
             source "/tmp/meta_${IDX}.env"
             {
-              echo "# File $IDX : $FILE"
+              echo "# File $IDX : $FILENAME"
               echo "# Source    : $URL"
-              echo "MD5    ($FILE) = $MD5"
-              echo "SHA1   ($FILE) = $SHA1"
-              echo "SHA256 ($FILE) = $SHA256"
-              echo "SHA512 ($FILE) = $SHA512"
+              echo "MD5    ($FILENAME) = $MD5"
+              echo "SHA1   ($FILENAME) = $SHA1"
+              echo "SHA256 ($FILENAME) = $SHA256"
+              echo "SHA512 ($FILENAME) = $SHA512"
               echo ""
-              echo "# sha256sum-compatible:"
-              echo "$SHA256  $FILE"
+              echo "# sha256sum-compatible (verify with: sha256sum -c checksums.txt)"
+              echo "$SHA256  $FILENAME"
               echo ""
-            } >> "$OUT"
+            } >> checksums.txt
           done < /tmp/urls.txt
 
-          echo "checksums_file=$OUT" >> "$GITHUB_OUTPUT"
+          echo "checksums.txt generated."
 
-      # ── 14. Generate metadata.json ────────────────────────────────────────────
+      # ── 12. Generate metadata.json ────────────────────────────────────────────
       - name: Generate metadata.json
         run: |
           python3 - <<'PYEOF'
           import json, os
 
-          urls = open('/tmp/urls.txt').read().strip().splitlines()
+          urls  = open('/tmp/urls.txt').read().strip().splitlines()
+          fnames = open('/tmp/filenames.txt').read().strip().splitlines()
           files = []
 
-          for idx, url in enumerate(urls, 1):
+          for idx, (url, fname) in enumerate(zip(urls, fnames), 1):
               env = {}
               for line in open(f'/tmp/meta_{idx}.env').read().strip().splitlines():
                   if '=' in line:
                       k, v = line.split('=', 1)
                       env[k] = v
 
-              vt_file = f'/tmp/vt_{idx}.txt'
-              vt = open(vt_file).read().strip() if os.path.exists(vt_file) else None
+              vt_path = f'/tmp/vt_{idx}.txt'
+              vt = open(vt_path).read().strip() if os.path.exists(vt_path) else None
 
               files.append({
-                  "index":        idx,
-                  "filename":     env.get("FILE"),
-                  "source_url":   url,
-                  "source_type":  open(f'/tmp/source_type_{idx}.txt').read().strip(),
-                  "mime_type":    env.get("MIME"),
-                  "size":         {"bytes": int(env.get("SIZE_BYTES", 0)), "human": env.get("SIZE_HUMAN")},
+                  "index":          idx,
+                  "filename":       fname,
+                  "source_url":     url,
+                  "source_type":    open(f'/tmp/source_type_{idx}.txt').read().strip(),
+                  "mime_type":      env.get("MIME"),
+                  "size":           {"bytes": int(env.get("SIZE_BYTES", 0)),
+                                     "human": env.get("SIZE_HUMAN")},
                   "download_speed": env.get("SPEED_HUMAN"),
-                  "duration_sec": float(env.get("DURATION", 0)),
-                  "checksums":    {"md5": env.get("MD5"), "sha1": env.get("SHA1"),
-                                   "sha256": env.get("SHA256"), "sha512": env.get("SHA512")},
-                  "virustotal":   vt
+                  "duration_sec":   float(env.get("DURATION", 0)),
+                  "checksums":      {"md5":    env.get("MD5"),
+                                     "sha1":   env.get("SHA1"),
+                                     "sha256": env.get("SHA256"),
+                                     "sha512": env.get("SHA512")},
+                  "virustotal":     vt
               })
 
           output = {
@@ -820,12 +779,9 @@ jobs:
                   "actor":      os.environ["ACTOR"]
               },
               "integrity": {
-                  "expected_md5":    os.environ.get("EXP_MD5") or None,
-                  "expected_sha1":   os.environ.get("EXP_SHA1") or None,
                   "expected_sha256": os.environ.get("EXP_SHA256") or None,
-                  "gpg_status":      os.environ.get("GPG_STATUS") or None
+                  "clamav":          os.environ.get("CLAMAV_SUMMARY")
               },
-              "antivirus": {"clamav": os.environ.get("CLAMAV_SUMMARY")},
               "files": files
           }
 
@@ -839,13 +795,10 @@ jobs:
           REPO:           ${{ github.repository }}
           RUN_ID:         ${{ github.run_id }}
           ACTOR:          ${{ github.actor }}
-          EXP_MD5:        ${{ inputs.expected_md5 }}
-          EXP_SHA1:       ${{ inputs.expected_sha1 }}
           EXP_SHA256:     ${{ inputs.expected_sha256 }}
-          GPG_STATUS:     ${{ steps.gpg.outputs.gpg_status }}
           CLAMAV_SUMMARY: ${{ steps.clamav.outputs.scan_summary }}
 
-      # ── 15. Resolve release tag ───────────────────────────────────────────────
+      # ── 13. Resolve release tag ───────────────────────────────────────────────
       - name: Resolve release tag
         id: tag
         run: |
@@ -856,47 +809,57 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      # ── 16. Stage artifact files ──────────────────────────────────────────────
-      - name: Stage artifact files
+      # ── 14. Stage release files ───────────────────────────────────────────────
+      # Fix 7: Copy all files into a single staging directory.
+      #        Release action uses a glob — no space/delimiter issues.
+      - name: Stage release files
         if: ${{ inputs.dry_run != true }}
         run: |
-          mkdir -p /tmp/artifact_staging
-          for F in ${{ steps.collect.outputs.filenames }} checksums.txt metadata.json; do
-            cp "$F" /tmp/artifact_staging/ 2>/dev/null || true
-          done
+          mkdir -p /tmp/release_staging
 
+          # Copy all downloaded files
+          while IFS= read -r FILENAME; do
+            cp "./$FILENAME" "/tmp/release_staging/$FILENAME"
+          done < /tmp/filenames.txt
+
+          # Copy support files
+          cp checksums.txt  /tmp/release_staging/
+          cp metadata.json  /tmp/release_staging/
+
+          echo "Staged files:"
+          ls -lh /tmp/release_staging/
+
+      # ── 15. Upload Actions artifact ───────────────────────────────────────────
       - name: Upload artifact bundle
         if: ${{ inputs.dry_run != true }}
-        id: artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ steps.tag.outputs.tag }}
-          path: /tmp/artifact_staging/
+          path: /tmp/release_staging/
           retention-days: ${{ inputs.artifact_retention_days }}
           if-no-files-found: error
 
-      # ── 17. Build release body ────────────────────────────────────────────────
+      # ── 16. Build release body ────────────────────────────────────────────────
       - name: Build release body
         id: body
         run: |
           BODY="/tmp/release_body.md"
-          PREFIX="${{ inputs.release_body_prefix }}"
-          SUFFIX="${{ inputs.release_body_suffix }}"
-
-          [ -n "$PREFIX" ] && printf '%s\n\n---\n\n' "$PREFIX" >> "$BODY"
-
           IDX=0
+
           while IFS= read -r URL; do
             IDX=$((IDX+1))
             source "/tmp/meta_${IDX}.env"
             SRC=$(cat "/tmp/source_type_${IDX}.txt")
 
+            VT_RESULT="— (not checked)"
+            [ -f "/tmp/vt_${IDX}.txt" ] && VT_RESULT=$(cat "/tmp/vt_${IDX}.txt")
+
             cat >> "$BODY" <<MDEOF
-          ## 📦 File $IDX — \`$FILE\`
+          ## 📦 File $IDX — \`$FILENAME\`
 
           | Field | Value |
           |---|---|
-          | **Filename** | \`$FILE\` |
+          | **Filename** | \`$FILENAME\` |
           | **MIME Type** | \`$MIME\` |
           | **Size** | $SIZE_HUMAN ($SIZE_BYTES bytes) |
           | **Source type** | $SRC |
@@ -915,34 +878,36 @@ jobs:
           | **SHA-256** | \`$SHA256\` |
           | **SHA-512** | \`$SHA512\` |
 
+          ### 🛡️ VirusTotal
+          $VT_RESULT
+
           MDEOF
           done < /tmp/urls.txt
 
           EXP_SHA256="${{ inputs.expected_sha256 }}"
-          GPG="${{ steps.gpg.outputs.gpg_status }}"
           CLAMAV="${{ steps.clamav.outputs.scan_summary }}"
-          VT="${{ steps.vt.outputs.vt_summary }}"
 
           cat >> "$BODY" <<MDEOF
-          ## 🛡️ Security
+          ---
+
+          ## 🛡️ Security Summary
 
           | Check | Result |
           |---|---|
           | **SHA-256 integrity** | $( [ -n "$EXP_SHA256" ] && echo "✅ Verified" || echo "— (not provided)" ) |
-          | **GPG signature** | $( [ -n "$GPG" ] && echo "$GPG" || echo "— (not provided)" ) |
           | **Antivirus (ClamAV)** | $CLAMAV |
-          | **VirusTotal** | $( [ -n "$VT" ] && echo "$VT" || echo "— (not checked)" ) |
 
-          > \`checksums.txt\` and \`metadata.json\` are attached. Verify with: \`sha256sum -c checksums.txt\`
+          > \`checksums.txt\` and \`metadata.json\` are attached to this release.
+          > Verify integrity with: \`sha256sum -c checksums.txt\`
 
           ---
           > _Released by @${{ github.actor }} — [View workflow run](${{ steps.meta.outputs.run_url }})_
           MDEOF
 
-          [ -n "$SUFFIX" ] && printf '\n---\n\n%s\n' "$SUFFIX" >> "$BODY"
           echo "body_file=$BODY" >> "$GITHUB_OUTPUT"
 
-      # ── 18. Create or append GitHub Release ──────────────────────────────────
+      # ── 17. Create or append GitHub Release ──────────────────────────────────
+      # Fix 7: Use glob on staging directory — safe for all filenames.
       - name: Create or append Release
         id: release
         if: ${{ inputs.dry_run != true }}
@@ -954,15 +919,12 @@ jobs:
           draft:       ${{ inputs.draft }}
           append_body: ${{ inputs.append_to_existing }}
           body_path:   ${{ steps.body.outputs.body_file }}
-          files: |
-            ${{ steps.collect.outputs.filenames }}
-            checksums.txt
-            metadata.json
+          files:       /tmp/release_staging/*
           make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 19. Delete artifact after release (optional) ──────────────────────────
+      # ── 18. Delete artifact after release (optional) ──────────────────────────
       - name: Delete artifact after release
         if: ${{ inputs.dry_run != true && inputs.delete_artifact_after_release == true }}
         uses: geekyeggo/delete-artifact@v5
@@ -970,7 +932,7 @@ jobs:
           name: release-${{ steps.tag.outputs.tag }}
           failOnError: false
 
-      # ── 20. Write job summary ─────────────────────────────────────────────────
+      # ── 19. Write job summary ─────────────────────────────────────────────────
       - name: Write job summary
         if: always()
         run: |
@@ -988,8 +950,10 @@ jobs:
               [ -f "/tmp/meta_${IDX}.env" ] || continue
               source "/tmp/meta_${IDX}.env"
               SRC=$(cat "/tmp/source_type_${IDX}.txt" 2>/dev/null || echo "unknown")
+              VT="— (not checked)"
+              [ -f "/tmp/vt_${IDX}.txt" ] && VT=$(cat "/tmp/vt_${IDX}.txt")
 
-              echo "## File $IDX: \`$FILE\`"
+              echo "## File $IDX: \`$FILENAME\`"
               echo "| Field | Value |"
               echo "|---|---|"
               echo "| **MIME** | \`$MIME\` |"
@@ -1001,6 +965,7 @@ jobs:
               echo "| **SHA-256** | \`$SHA256\` |"
               echo "| **SHA-512** | \`$SHA512\` |"
               echo "| **URL** | \`$URL\` |"
+              echo "| **VirusTotal** | $VT |"
               echo ""
             done < /tmp/urls.txt
 
@@ -1008,8 +973,6 @@ jobs:
             echo "| Check | Result |"
             echo "|---|---|"
             echo "| **ClamAV** | ${{ steps.clamav.outputs.scan_summary }} |"
-            echo "| **VirusTotal** | ${{ steps.vt.outputs.vt_summary || '— (not checked)' }} |"
-            echo "| **GPG** | ${{ steps.gpg.outputs.gpg_status || '— (not checked)' }} |"
             echo ""
 
             if [ "$DRY" = "true" ]; then
@@ -1019,9 +982,9 @@ jobs:
               echo "| Artifact upload | ⏭️ Skipped |"
               echo "| GitHub Release creation | ⏭️ Skipped |"
               echo "| Artifact deletion | ⏭️ Skipped |"
-              echo "| Discord / Slack / Telegram notifications | ⏭️ Skipped |"
+              echo "| Notifications (Discord/Slack/Telegram) | ⏭️ Skipped |"
               echo ""
-              echo "_All download, validation, hash, and scan steps executed normally._"
+              echo "_All download, validation, hash, and scan steps ran normally._"
             else
               echo "## 🚀 Release"
               echo "| Field | Value |"
@@ -1031,7 +994,7 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # Also print a structured table to the raw step log
+          # Structured table in raw log
           echo ""
           echo "════════════════════════════════════════════════════════"
           echo "  FINAL SUMMARY"
@@ -1041,17 +1004,18 @@ jobs:
             IDX=$((IDX+1))
             [ -f "/tmp/meta_${IDX}.env" ] || continue
             source "/tmp/meta_${IDX}.env"
-            printf "  %-12s %s\n" "File $IDX:"  "$FILE"
-            printf "  %-12s %s (%s bytes)\n" "Size:" "$SIZE_HUMAN" "$SIZE_BYTES"
-            printf "  %-12s %s\n" "MD5:"        "$MD5"
-            printf "  %-12s %s\n" "SHA-256:"    "$SHA256"
-            printf "  %-12s %s\n" "Speed:"      "$SPEED_HUMAN"
+            printf "  %-12s %s\n"             "File $IDX:"  "$FILENAME"
+            printf "  %-12s %s (%s bytes)\n"  "Size:"       "$SIZE_HUMAN" "$SIZE_BYTES"
+            printf "  %-12s %s\n"             "MD5:"        "$MD5"
+            printf "  %-12s %s\n"             "SHA-256:"    "$SHA256"
+            printf "  %-12s %s\n"             "Speed:"      "$SPEED_HUMAN"
             echo   "  ────────────────────────────────────────────────────"
           done < /tmp/urls.txt
-          [ "$DRY" != "true" ] && [ -n "$RELEASE_URL" ] && printf "  %-12s %s\n" "Release:" "$RELEASE_URL"
+          [ "$DRY" != "true" ] && [ -n "$RELEASE_URL" ] && \
+            printf "  %-12s %s\n" "Release:" "$RELEASE_URL"
           echo "════════════════════════════════════════════════════════"
 
-      # ── 21. Write failure summary ─────────────────────────────────────────────
+      # ── 20. Write failure summary ─────────────────────────────────────────────
       - name: Write failure summary
         if: failure()
         run: |
@@ -1063,116 +1027,134 @@ jobs:
 
           | Possible cause | How to fix |
           |---|---|
-          | URL returned non-2xx or unreachable | Check the URL is publicly accessible |
-          | Downloaded file was an HTML page | URL may need auth or uses a landing page |
-          | File size exceeded limit | Raise \`max_size_mb\` or use a different URL |
-          | MIME type not in allowlist | Add the MIME type to \`allowed_mimes\` |
-          | Hash integrity mismatch | Verify the expected hash is correct |
-          | GPG signature invalid | Check the public key and signature URL |
-          | Input validation error | Review the input values above |
+          | URL returned non-2xx or unreachable | Verify the URL is publicly accessible |
+          | Downloaded file was an HTML page | URL may need auth or redirects to a landing page |
+          | File size exceeded limit | Raise `max_size_mb` or use a smaller source |
+          | MIME type not in allowlist | Add the MIME type to `allowed_mimes` |
+          | SHA-256 mismatch | Verify the expected hash matches the file |
+          | Input validation error | Review the inputs listed above |
+          | VirusTotal quota exceeded | VT free tier is 4 req/min — reduce URL count or upgrade |
 
-          Check the individual step logs above for the exact error.
+          Check the individual step logs above for the exact error message.
           EOF
 
-      # ── 22. Discord notification ──────────────────────────────────────────────
+      # ── 21. Discord notification ──────────────────────────────────────────────
       - name: Notify Discord
-        if: ${{ inputs.dry_run != true && inputs.discord_webhook_url != '' }}
+        if: ${{ inputs.dry_run != true && secrets.DISCORD_WEBHOOK != '' }}
         run: |
           python3 - <<'PYEOF'
           import json, os, urllib.request
 
-          filenames = os.environ.get("FILENAMES", "").split()
-          fields = [{"name": f"File {i+1}", "value": f"`{f}`", "inline": True}
-                    for i, f in enumerate(filenames)]
+          # Fix 2: Read filenames from newline-delimited file — safe for spaces
+          with open('/tmp/filenames.txt') as f:
+              filenames = [l.strip() for l in f if l.strip()]
+
+          fields = [{"name": f"File {i+1}", "value": f"`{fn}`", "inline": True}
+                    for i, fn in enumerate(filenames)]
           fields += [
               {"name": "Release",    "value": os.environ.get("RELEASE_URL", "—"), "inline": False},
               {"name": "ClamAV",     "value": os.environ.get("CLAMAV", "—"),      "inline": True},
-              {"name": "VirusTotal", "value": os.environ.get("VT", "—"),          "inline": True},
           ]
 
-          payload = {"embeds": [{"title": f"📦 New Release: {os.environ['TAG']}",
-                                 "url": os.environ.get("RELEASE_URL", ""),
-                                 "color": 5763719, "fields": fields,
-                                 "footer": {"text": f"GitHub Actions • {os.environ['REPO']}"}}]}
-          req = urllib.request.Request(os.environ["WEBHOOK"],
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"}, method="POST")
+          payload = {"embeds": [{
+              "title":  f"📦 New Release: {os.environ['TAG']}",
+              "url":    os.environ.get("RELEASE_URL", ""),
+              "color":  5763719,
+              "fields": fields,
+              "footer": {"text": f"GitHub Actions • {os.environ['REPO']}"}
+          }]}
+
+          req = urllib.request.Request(
+              os.environ["DISCORD_WEBHOOK"],
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST")
           urllib.request.urlopen(req)
           print("Discord notification sent.")
           PYEOF
         env:
-          WEBHOOK:     ${{ inputs.discord_webhook_url }}
-          TAG:         ${{ steps.tag.outputs.tag }}
-          FILENAMES:   ${{ steps.collect.outputs.filenames }}
-          RELEASE_URL: ${{ steps.release.outputs.url }}
-          CLAMAV:      ${{ steps.clamav.outputs.scan_summary }}
-          VT:          ${{ steps.vt.outputs.vt_summary }}
-          REPO:        ${{ github.repository }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          TAG:             ${{ steps.tag.outputs.tag }}
+          RELEASE_URL:     ${{ steps.release.outputs.url }}
+          CLAMAV:          ${{ steps.clamav.outputs.scan_summary }}
+          REPO:            ${{ github.repository }}
 
-      # ── 23. Slack notification ────────────────────────────────────────────────
+      # ── 22. Slack notification ────────────────────────────────────────────────
       - name: Notify Slack
-        if: ${{ inputs.dry_run != true && inputs.slack_webhook_url != '' }}
+        if: ${{ inputs.dry_run != true && secrets.SLACK_WEBHOOK != '' }}
         run: |
           python3 - <<'PYEOF'
           import json, os, urllib.request
 
-          filenames = os.environ.get("FILENAMES", "").split()
-          file_list = "\n".join(f"• `{f}`" for f in filenames)
+          # Fix 2: Read filenames from newline-delimited file — safe for spaces
+          with open('/tmp/filenames.txt') as f:
+              filenames = [l.strip() for l in f if l.strip()]
+          file_list = "\n".join(f"• `{fn}`" for fn in filenames)
 
           payload = {"blocks": [
               {"type": "header",
-               "text": {"type": "plain_text", "text": f"📦 New Release: {os.environ['TAG']}"}},
+               "text": {"type": "plain_text",
+                        "text": f"📦 New Release: {os.environ['TAG']}"}},
               {"type": "section",
                "fields": [
                    {"type": "mrkdwn", "text": f"*Files:*\n{file_list}"},
                    {"type": "mrkdwn", "text": f"*ClamAV:*\n{os.environ.get('CLAMAV','—')}"},
-                   {"type": "mrkdwn", "text": f"*VirusTotal:*\n{os.environ.get('VT','—')}"},
                    {"type": "mrkdwn", "text": f"*Repo:*\n{os.environ.get('REPO')}"},
                ]},
-              {"type": "actions", "elements": [{"type": "button",
-               "text": {"type": "plain_text", "text": "View Release"},
-               "url": os.environ.get("RELEASE_URL", "")}]}
+              {"type": "actions", "elements": [{
+                  "type": "button",
+                  "text": {"type": "plain_text", "text": "View Release"},
+                  "url":  os.environ.get("RELEASE_URL", "")
+              }]}
           ]}
-          req = urllib.request.Request(os.environ["WEBHOOK"],
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"}, method="POST")
+
+          req = urllib.request.Request(
+              os.environ["SLACK_WEBHOOK"],
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST")
           urllib.request.urlopen(req)
           print("Slack notification sent.")
           PYEOF
         env:
-          WEBHOOK:     ${{ inputs.slack_webhook_url }}
-          TAG:         ${{ steps.tag.outputs.tag }}
-          FILENAMES:   ${{ steps.collect.outputs.filenames }}
-          RELEASE_URL: ${{ steps.release.outputs.url }}
-          CLAMAV:      ${{ steps.clamav.outputs.scan_summary }}
-          VT:          ${{ steps.vt.outputs.vt_summary }}
-          REPO:        ${{ github.repository }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          TAG:           ${{ steps.tag.outputs.tag }}
+          RELEASE_URL:   ${{ steps.release.outputs.url }}
+          CLAMAV:        ${{ steps.clamav.outputs.scan_summary }}
+          REPO:          ${{ github.repository }}
 
-      # ── 24. Telegram notification ─────────────────────────────────────────────
+      # ── 23. Telegram notification ─────────────────────────────────────────────
       - name: Notify Telegram
-        if: ${{ inputs.dry_run != true && inputs.telegram_bot_token != '' && inputs.telegram_chat_id != '' }}
+        if: ${{ inputs.dry_run != true && secrets.TELEGRAM_BOT_TOKEN != '' && inputs.telegram_chat_id != '' }}
         run: |
           python3 - <<'PYEOF'
           import os, urllib.request, urllib.parse
 
-          filenames = os.environ.get("FILENAMES", "").split()
-          file_lines = "\n".join(f"  • `{f}`" for f in filenames)
+          # Fix 2: Read filenames from newline-delimited file — safe for spaces
+          with open('/tmp/filenames.txt') as f:
+              filenames = [l.strip() for l in f if l.strip()]
+          file_lines = "\n".join(f"  • `{fn}`" for fn in filenames)
 
-          text = (f"*📦 New Release: {os.environ['TAG']}*\n"
-                  f"Files:\n{file_lines}\n"
-                  f"ClamAV: {os.environ.get('CLAMAV','—')}\n"
-                  f"[View Release]({os.environ.get('RELEASE_URL','')})")
+          text = (
+              f"*📦 New Release: {os.environ['TAG']}*\n"
+              f"Files:\n{file_lines}\n"
+              f"ClamAV: {os.environ.get('CLAMAV','—')}\n"
+              f"[View Release]({os.environ.get('RELEASE_URL','')})"
+          )
 
-          params = urllib.parse.urlencode({"chat_id": os.environ["CHAT_ID"],
-                                           "text": text, "parse_mode": "Markdown"})
+          params = urllib.parse.urlencode({
+              "chat_id":    os.environ["TELEGRAM_CHAT_ID"],
+              "text":       text,
+              "parse_mode": "Markdown"
+          })
           urllib.request.urlopen(
-              f"https://api.telegram.org/bot{os.environ['BOT_TOKEN']}/sendMessage?{params}")
+              f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage?{params}"
+          )
           print("Telegram notification sent.")
           PYEOF
         env:
-          BOT_TOKEN:   ${{ inputs.telegram_bot_token }}
-          CHAT_ID:     ${{ inputs.telegram_chat_id }}
-          TAG:         ${{ steps.tag.outputs.tag }}
-          FILENAMES:   ${{ steps.collect.outputs.filenames }}
-          RELEASE_URL: ${{ steps.release.outputs.url }}
-          CLAMAV:      ${{ steps.clamav.outputs.scan_summary }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ inputs.telegram_chat_id }}
+          TAG:                ${{ steps.tag.outputs.tag }}
+          RELEASE_URL:        ${{ steps.release.outputs.url }}
+          CLAMAV:             ${{ steps.clamav.outputs.scan_summary }}
