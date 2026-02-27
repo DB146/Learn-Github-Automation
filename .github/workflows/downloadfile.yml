@@ -1,4 +1,4 @@
-name: Download, Artifact & Release
+name: Download, Artifact & Releases
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Secrets used (configure in repo/org Settings → Secrets → Actions):
