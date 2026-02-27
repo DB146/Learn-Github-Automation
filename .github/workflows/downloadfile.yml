@@ -4,19 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       download_url:
-        description: "Direct download URL"
+        description: "Direct download URL (http/https)"
         required: true
         type: string
+
+      # ── Release options ────────────────────────────────────────────────────
       release_tag:
-        description: "Release tag (e.g. v1.0.0)"
-        required: true
+        description: "Release tag (e.g. v1.0.0) — leave blank to auto-generate from date/time"
+        required: false
         type: string
       release_name:
         description: "Release title (optional, defaults to tag)"
-        required: false
-        type: string
-      expected_sha256:
-        description: "Expected SHA-256 hash for integrity check (optional)"
         required: false
         type: string
       prerelease:
@@ -24,11 +22,59 @@ on:
         required: false
         type: boolean
         default: false
+      draft:
+        description: "Save as draft release (publish manually later)?"
+        required: false
+        type: boolean
+        default: false
+      append_to_existing:
+        description: "If the tag already exists, append file to that release instead of failing?"
+        required: false
+        type: boolean
+        default: false
+
+      # ── Integrity & safety ─────────────────────────────────────────────────
+      expected_sha256:
+        description: "Expected SHA-256 hash for integrity check (optional)"
+        required: false
+        type: string
+      max_size_mb:
+        description: "Reject download if file exceeds this size in MB (0 = no limit)"
+        required: false
+        type: number
+        default: 0
+      allowed_mimes:
+        description: "Comma-separated MIME type allowlist, e.g. application/zip,application/vnd.android.package-archive (blank = allow all)"
+        required: false
+        type: string
+
+      # ── Artifact ───────────────────────────────────────────────────────────
       artifact_retention_days:
         description: "Artifact retention in days (1–90)"
         required: false
         type: number
         default: 90
+
+      # ── Notifications ──────────────────────────────────────────────────────
+      discord_webhook_url:
+        description: "Discord webhook URL for release notification (optional)"
+        required: false
+        type: string
+      telegram_bot_token:
+        description: "Telegram bot token for release notification (optional)"
+        required: false
+        type: string
+      telegram_chat_id:
+        description: "Telegram chat ID (required if telegram_bot_token is set)"
+        required: false
+        type: string
+
+      # ── Misc ───────────────────────────────────────────────────────────────
+      dry_run:
+        description: "Dry run — download and validate only, skip artifact upload and release creation"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   download-and-release:
@@ -42,18 +88,15 @@ jobs:
         run: |
           URL="${{ github.event.inputs.download_url }}"
 
-          # Reject non-http(s) schemes entirely
           if [[ ! "$URL" =~ ^https?:// ]]; then
             echo "::error::URL must start with http:// or https://. Got: $URL"
             exit 1
           fi
 
-          # Warn (but do not fail) for plain HTTP
           if [[ "$URL" =~ ^http:// ]]; then
             echo "::warning::The provided URL uses plain HTTP, which is unencrypted. Consider using HTTPS if available."
           fi
 
-          # Check the URL is reachable before wasting time on a full download
           HTTP_CODE=$(curl -o /dev/null -sI -w "%{http_code}" --max-time 15 --location "$URL")
           if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 400 ]; then
             echo "::error::URL pre-flight check failed — server returned HTTP $HTTP_CODE for: $URL"
@@ -62,14 +105,39 @@ jobs:
 
           echo "URL pre-flight check passed (HTTP $HTTP_CODE)."
 
-      # ── 2. Download the file, preserving original filename ──────────────────
-      - name: Download file
-        id: download
+      # ── 2. Install tools ────────────────────────────────────────────────────
+      - name: Install tools (aria2, ClamAV)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq aria2 clamav clamav-daemon
+          # Update ClamAV signatures (best-effort — don't fail if it times out)
+          sudo freshclam --quiet || echo "::warning::ClamAV signature update failed — using existing definitions."
+
+      # ── 3. Resolve filename & detect special sources ─────────────────────────
+      - name: Resolve filename and detect source type
+        id: resolve
         run: |
           URL="${{ github.event.inputs.download_url }}"
+          SOURCE_TYPE="generic"
+
+          # Detect Google Drive
+          if echo "$URL" | grep -qE "drive\.google\.com/(file/d/|open\?id=)"; then
+            SOURCE_TYPE="gdrive"
+            FILE_ID=$(echo "$URL" | grep -oP '(?<=/d/)[^/]+|(?<=id=)[^&]+' | head -1)
+            echo "Detected Google Drive link. File ID: $FILE_ID"
+            echo "source_type=gdrive"  >> "$GITHUB_OUTPUT"
+            echo "gdrive_id=$FILE_ID"  >> "$GITHUB_OUTPUT"
+          # Detect SourceForge
+          elif echo "$URL" | grep -qE "sourceforge\.net"; then
+            SOURCE_TYPE="sourceforge"
+            echo "Detected SourceForge link."
+            echo "source_type=sourceforge" >> "$GITHUB_OUTPUT"
+          else
+            echo "source_type=generic" >> "$GITHUB_OUTPUT"
+          fi
 
           # ── Resolve filename ────────────────────────────────────────────────
-          # 1) Try standard Content-Disposition: filename="foo.apk"
+          # 1) Standard Content-Disposition: filename="foo.apk"
           FILENAME=$(
             curl -sI --location "$URL" \
               | grep -i 'content-disposition' \
@@ -77,7 +145,7 @@ jobs:
               | tr -d '\r'
           )
 
-          # 2) Try RFC 5987 encoded: filename*=UTF-8''foo%20bar.apk
+          # 2) RFC 5987: filename*=UTF-8''foo%20bar.apk
           if [ -z "$FILENAME" ]; then
             FILENAME=$(
               curl -sI --location "$URL" \
@@ -88,7 +156,7 @@ jobs:
             )
           fi
 
-          # 3) Fall back to URL path basename (strip query string)
+          # 3) URL path basename
           if [ -z "$FILENAME" ]; then
             FILENAME=$(basename "$(echo "$URL" | cut -d'?' -f1)")
           fi
@@ -97,15 +165,71 @@ jobs:
           FILENAME="${FILENAME:-downloaded_file}"
 
           echo "Resolved filename: $FILENAME"
+          echo "filename=$FILENAME" >> "$GITHUB_OUTPUT"
 
-          # ── Download ────────────────────────────────────────────────────────
+      # ── 4. Download ──────────────────────────────────────────────────────────
+      - name: Download file
+        id: download
+        run: |
+          URL="${{ github.event.inputs.download_url }}"
+          FILENAME="${{ steps.resolve.outputs.filename }}"
+          SOURCE_TYPE="${{ steps.resolve.outputs.source_type }}"
+
           START_TIME=$(date +%s%N)
 
-          curl -L --fail --retry 3 --retry-delay 5 \
-               --location-trusted \
-               -b /tmp/cookies.txt -c /tmp/cookies.txt \
-               -A "Mozilla/5.0 (compatible; GitHub-Actions-Downloader/1.0)" \
-               -o "$FILENAME" "$URL"
+          if [ "$SOURCE_TYPE" = "gdrive" ]; then
+            # ── Google Drive: resolve confirm token then download ──────────────
+            FILE_ID="${{ steps.resolve.outputs.gdrive_id }}"
+            CONFIRM=$(curl -sc /tmp/gdrive_cookies.txt \
+              "https://drive.google.com/uc?export=download&id=${FILE_ID}" \
+              | grep -o 'confirm=[^&"]*' | head -1 | cut -d= -f2)
+            if [ -n "$CONFIRM" ]; then
+              curl -Lb /tmp/gdrive_cookies.txt \
+                "https://drive.google.com/uc?export=download&confirm=${CONFIRM}&id=${FILE_ID}" \
+                -o "$FILENAME"
+            else
+              curl -L "https://drive.google.com/uc?export=download&id=${FILE_ID}" \
+                -o "$FILENAME"
+            fi
+
+          elif [ "$SOURCE_TYPE" = "sourceforge" ]; then
+            # ── SourceForge: follow mirror redirects with extra patience ────────
+            curl -L --fail --retry 5 --retry-delay 10 \
+                 --max-time 600 \
+                 --location-trusted \
+                 -b /tmp/cookies.txt -c /tmp/cookies.txt \
+                 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+                 -o "$FILENAME" "$URL"
+
+          else
+            # ── Generic: try aria2c first, fall back to curl ────────────────────
+            if aria2c --version > /dev/null 2>&1; then
+              aria2c \
+                --split=8 \
+                --max-connection-per-server=8 \
+                --min-split-size=5M \
+                --max-tries=5 \
+                --retry-wait=5 \
+                --allow-overwrite=true \
+                --auto-file-renaming=false \
+                --out="$FILENAME" \
+                "$URL" \
+              || {
+                echo "::warning::aria2c failed, falling back to curl."
+                curl -L --fail --retry 3 --retry-delay 5 \
+                     --location-trusted \
+                     -b /tmp/cookies.txt -c /tmp/cookies.txt \
+                     -A "Mozilla/5.0 (compatible; GitHub-Actions-Downloader/1.0)" \
+                     -o "$FILENAME" "$URL"
+              }
+            else
+              curl -L --fail --retry 3 --retry-delay 5 \
+                   --location-trusted \
+                   -b /tmp/cookies.txt -c /tmp/cookies.txt \
+                   -A "Mozilla/5.0 (compatible; GitHub-Actions-Downloader/1.0)" \
+                   -o "$FILENAME" "$URL"
+            fi
+          fi
 
           END_TIME=$(date +%s%N)
           DURATION_MS=$(( (END_TIME - START_TIME) / 1000000 ))
@@ -114,7 +238,7 @@ jobs:
           # ── HTML-page detection ─────────────────────────────────────────────
           DETECTED_MIME=$(file --mime-type -b "$FILENAME")
           if [[ "$DETECTED_MIME" == "text/html" ]]; then
-            echo "::error::Downloaded file appears to be an HTML page (MIME: $DETECTED_MIME). The URL may require authentication, redirect through a landing page, or the link may have expired."
+            echo "::error::Downloaded file appears to be an HTML page (MIME: $DETECTED_MIME). The URL may require authentication, use a landing/mirror page, or the link may have expired."
             echo "--- First 500 bytes of received content ---"
             head -c 500 "$FILENAME"
             exit 1
@@ -124,7 +248,7 @@ jobs:
           echo "duration_sec=$DURATION_SEC" >> "$GITHUB_OUTPUT"
           echo "Download complete in ${DURATION_SEC}s."
 
-      # ── 3. Compute metadata ─────────────────────────────────────────────────
+      # ── 5. Compute metadata ─────────────────────────────────────────────────
       - name: Compute file metadata
         id: meta
         run: |
@@ -171,28 +295,102 @@ jobs:
           echo "SHA-512    : $SHA512"
           echo "Downloaded : $TIMESTAMP"
 
-      # ── 4. Verify integrity (optional) ──────────────────────────────────────
+      # ── 6. Max file size guard ───────────────────────────────────────────────
+      - name: Check max file size
+        if: ${{ github.event.inputs.max_size_mb != '0' && github.event.inputs.max_size_mb != '' }}
+        run: |
+          SIZE_BYTES="${{ steps.meta.outputs.size_bytes }}"
+          MAX_MB="${{ github.event.inputs.max_size_mb }}"
+          MAX_BYTES=$(echo "$MAX_MB * 1048576" | bc)
+
+          if (( SIZE_BYTES > MAX_BYTES )); then
+            echo "::error::File size (${{ steps.meta.outputs.size_human }}) exceeds the configured limit of ${MAX_MB} MB."
+            exit 1
+          fi
+
+          echo "File size check passed (${{ steps.meta.outputs.size_human }} ≤ ${MAX_MB} MB)."
+
+      # ── 7. MIME type allowlist check ─────────────────────────────────────────
+      - name: Check MIME type allowlist
+        if: ${{ github.event.inputs.allowed_mimes != '' }}
+        run: |
+          ACTUAL_MIME="${{ steps.meta.outputs.mime }}"
+          ALLOWED="${{ github.event.inputs.allowed_mimes }}"
+
+          # Check if actual MIME is in the comma-separated allowlist
+          MATCH=false
+          IFS=',' read -ra MIME_LIST <<< "$ALLOWED"
+          for M in "${MIME_LIST[@]}"; do
+            TRIMMED=$(echo "$M" | tr -d ' ')
+            if [ "$TRIMMED" = "$ACTUAL_MIME" ]; then
+              MATCH=true
+              break
+            fi
+          done
+
+          if [ "$MATCH" = "false" ]; then
+            echo "::error::MIME type '$ACTUAL_MIME' is not in the allowlist: $ALLOWED"
+            exit 1
+          fi
+
+          echo "MIME type check passed ('$ACTUAL_MIME' is allowed)."
+
+      # ── 8. SHA-256 integrity check ───────────────────────────────────────────
       - name: Verify SHA-256 integrity
         if: ${{ github.event.inputs.expected_sha256 != '' }}
         run: |
-          FILE="${{ steps.download.outputs.filename }}"
-          EXPECTED="${{ github.event.inputs.expected_sha256 }}"
-          ACTUAL="${{ steps.meta.outputs.sha256 }}"
+          EXPECTED=$(echo "${{ github.event.inputs.expected_sha256 }}" | tr '[:upper:]' '[:lower:]')
+          ACTUAL=$(echo "${{ steps.meta.outputs.sha256 }}"             | tr '[:upper:]' '[:lower:]')
 
-          # Normalize to lowercase for comparison
-          EXPECTED_LOWER=$(echo "$EXPECTED" | tr '[:upper:]' '[:lower:]')
-          ACTUAL_LOWER=$(echo "$ACTUAL"     | tr '[:upper:]' '[:lower:]')
-
-          if [ "$EXPECTED_LOWER" != "$ACTUAL_LOWER" ]; then
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "::error::SHA-256 integrity check FAILED!"
-            echo "  Expected : $EXPECTED_LOWER"
-            echo "  Actual   : $ACTUAL_LOWER"
+            echo "  Expected : $EXPECTED"
+            echo "  Actual   : $ACTUAL"
+
+            # Surface prominently to job summary
+            cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## ❌ SHA-256 Integrity Check FAILED
+
+          | | Hash |
+          |---|---|
+          | **Expected** | \`$EXPECTED\` |
+          | **Actual**   | \`$ACTUAL\` |
+
+          The downloaded file does not match the expected hash. The release was **not** created.
+          EOF
+
             exit 1
           fi
 
           echo "SHA-256 integrity check PASSED."
 
-      # ── 5. Generate checksums.txt ────────────────────────────────────────────
+      # ── 9. ClamAV virus scan ─────────────────────────────────────────────────
+      - name: ClamAV virus scan
+        id: clamav
+        run: |
+          FILE="${{ steps.download.outputs.filename }}"
+
+          SCAN_RESULT=$(clamscan --no-summary "$FILE" 2>&1 || true)
+          EXIT_CODE=$?
+
+          if echo "$SCAN_RESULT" | grep -q "FOUND"; then
+            SCAN_STATUS="⚠️ THREAT DETECTED"
+            SCAN_DETAIL=$(echo "$SCAN_RESULT" | grep "FOUND")
+            echo "::warning::ClamAV detected a potential threat: $SCAN_DETAIL"
+          elif [ $EXIT_CODE -ne 0 ]; then
+            SCAN_STATUS="⚠️ SCAN ERROR"
+            SCAN_DETAIL="ClamAV exited with code $EXIT_CODE"
+            echo "::warning::ClamAV scan error: $SCAN_DETAIL"
+          else
+            SCAN_STATUS="✅ Clean"
+            SCAN_DETAIL="No threats detected"
+          fi
+
+          echo "scan_status=$SCAN_STATUS" >> "$GITHUB_OUTPUT"
+          echo "scan_detail=$SCAN_DETAIL" >> "$GITHUB_OUTPUT"
+          echo "ClamAV: $SCAN_STATUS — $SCAN_DETAIL"
+
+      # ── 10. Generate checksums.txt ───────────────────────────────────────────
       - name: Generate checksums.txt
         id: checksums
         run: |
@@ -200,24 +398,111 @@ jobs:
           OUT="checksums.txt"
 
           cat > "$OUT" <<EOF
-          # Checksums for: $FILE
-          # Generated   : ${{ steps.meta.outputs.timestamp }}
-          # Source URL  : ${{ github.event.inputs.download_url }}
+          # Checksums for  : $FILE
+          # Generated      : ${{ steps.meta.outputs.timestamp }}
+          # Source URL     : ${{ github.event.inputs.download_url }}
+          # Workflow run   : ${{ steps.meta.outputs.run_url }}
 
           MD5     ($FILE) = ${{ steps.meta.outputs.md5 }}
           SHA1    ($FILE) = ${{ steps.meta.outputs.sha1 }}
           SHA256  ($FILE) = ${{ steps.meta.outputs.sha256 }}
           SHA512  ($FILE) = ${{ steps.meta.outputs.sha512 }}
 
-          # Standard sha256sum-compatible line (usable with: sha256sum -c checksums.txt)
+          # sha256sum-compatible (verify with: sha256sum -c checksums.txt)
           ${{ steps.meta.outputs.sha256 }}  $FILE
           EOF
 
           echo "checksums_file=$OUT" >> "$GITHUB_OUTPUT"
-          echo "checksums.txt generated."
 
-      # ── 6. Upload as GitHub Actions artifact ────────────────────────────────
+      # ── 11. Generate metadata.json ───────────────────────────────────────────
+      - name: Generate metadata.json
+        id: metajson
+        run: |
+          FILE="${{ steps.download.outputs.filename }}"
+          OUT="metadata.json"
+
+          python3 - <<'PYEOF'
+          import json, os
+
+          data = {
+            "filename":     os.environ.get("FILENAME"),
+            "source_url":   os.environ.get("SOURCE_URL"),
+            "source_type":  os.environ.get("SOURCE_TYPE"),
+            "downloaded_at": os.environ.get("TIMESTAMP"),
+            "mime_type":    os.environ.get("MIME"),
+            "size": {
+              "bytes": int(os.environ.get("SIZE_BYTES", 0)),
+              "human": os.environ.get("SIZE_HUMAN")
+            },
+            "download_speed": os.environ.get("SPEED_HUMAN"),
+            "duration_sec":   float(os.environ.get("DURATION_SEC", 0)),
+            "checksums": {
+              "md5":    os.environ.get("MD5"),
+              "sha1":   os.environ.get("SHA1"),
+              "sha256": os.environ.get("SHA256"),
+              "sha512": os.environ.get("SHA512")
+            },
+            "integrity_check": {
+              "expected_sha256": os.environ.get("EXPECTED_SHA256") or None,
+              "passed": (
+                os.environ.get("EXPECTED_SHA256", "").lower() ==
+                os.environ.get("SHA256", "").lower()
+              ) if os.environ.get("EXPECTED_SHA256") else None
+            },
+            "antivirus": {
+              "engine":  "ClamAV",
+              "status":  os.environ.get("SCAN_STATUS"),
+              "detail":  os.environ.get("SCAN_DETAIL")
+            },
+            "workflow": {
+              "run_url":    os.environ.get("RUN_URL"),
+              "repository": os.environ.get("REPO"),
+              "run_id":     os.environ.get("RUN_ID"),
+              "actor":      os.environ.get("ACTOR")
+            }
+          }
+
+          with open("metadata.json", "w") as f:
+              json.dump(data, f, indent=2)
+
+          print("metadata.json written.")
+          PYEOF
+        env:
+          FILENAME:        ${{ steps.download.outputs.filename }}
+          SOURCE_URL:      ${{ github.event.inputs.download_url }}
+          SOURCE_TYPE:     ${{ steps.resolve.outputs.source_type }}
+          TIMESTAMP:       ${{ steps.meta.outputs.timestamp }}
+          MIME:            ${{ steps.meta.outputs.mime }}
+          SIZE_BYTES:      ${{ steps.meta.outputs.size_bytes }}
+          SIZE_HUMAN:      ${{ steps.meta.outputs.size_human }}
+          SPEED_HUMAN:     ${{ steps.meta.outputs.speed_human }}
+          DURATION_SEC:    ${{ steps.download.outputs.duration_sec }}
+          MD5:             ${{ steps.meta.outputs.md5 }}
+          SHA1:            ${{ steps.meta.outputs.sha1 }}
+          SHA256:          ${{ steps.meta.outputs.sha256 }}
+          SHA512:          ${{ steps.meta.outputs.sha512 }}
+          EXPECTED_SHA256: ${{ github.event.inputs.expected_sha256 }}
+          SCAN_STATUS:     ${{ steps.clamav.outputs.scan_status }}
+          SCAN_DETAIL:     ${{ steps.clamav.outputs.scan_detail }}
+          RUN_URL:         ${{ steps.meta.outputs.run_url }}
+          REPO:            ${{ github.repository }}
+          RUN_ID:          ${{ github.run_id }}
+          ACTOR:           ${{ github.actor }}
+
+      # ── 12. Resolve release tag ──────────────────────────────────────────────
+      - name: Resolve release tag
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="dl-$(date -u +%Y%m%d-%H%M%S)"
+            echo "No tag provided — auto-generated: $TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # ── 13. Upload GitHub Actions artifact ───────────────────────────────────
       - name: Upload artifact
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.download.outputs.filename }}
@@ -225,16 +510,23 @@ jobs:
           retention-days: ${{ github.event.inputs.artifact_retention_days }}
           if-no-files-found: error
 
-      # ── 7. Create GitHub Release with metadata in description ───────────────
-      - name: Create Release
+      # ── 14. Create / append GitHub Release ───────────────────────────────────
+      - name: Create or append Release
+        id: release
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_name || github.event.inputs.release_tag }}
+          tag_name:   ${{ steps.tag.outputs.tag }}
+          name:       ${{ github.event.inputs.release_name || steps.tag.outputs.tag }}
           prerelease: ${{ github.event.inputs.prerelease }}
+          draft:      ${{ github.event.inputs.draft }}
+          # append_body + fail_on_unmatched_files: when append_to_existing=true,
+          # softprops will add files to an existing release if the tag exists.
+          append_body: ${{ github.event.inputs.append_to_existing }}
           files: |
             ${{ steps.download.outputs.filename }}
             ${{ steps.checksums.outputs.checksums_file }}
+            metadata.json
           body: |
             ## 📦 File Information
 
@@ -243,6 +535,7 @@ jobs:
             | **Filename** | `${{ steps.download.outputs.filename }}` |
             | **MIME Type** | `${{ steps.meta.outputs.mime }}` |
             | **Size** | ${{ steps.meta.outputs.size_human }} (${{ steps.meta.outputs.size_bytes }} bytes) |
+            | **Source type** | ${{ steps.resolve.outputs.source_type }} |
             | **Downloaded at** | ${{ steps.meta.outputs.timestamp }} |
             | **Download speed** | ${{ steps.meta.outputs.speed_human }} |
 
@@ -261,11 +554,127 @@ jobs:
             | **SHA-256** | `${{ steps.meta.outputs.sha256 }}` |
             | **SHA-512** | `${{ steps.meta.outputs.sha512 }}` |
 
-            > A standalone `checksums.txt` file is also attached to this release and is compatible with `sha256sum -c checksums.txt`.
+            > A standalone `checksums.txt` and machine-readable `metadata.json` are also attached to this release.  
+            > Verify with: `sha256sum -c checksums.txt`
+
+            ## 🛡️ Security
+
+            | Check | Result |
+            |---|---|
+            | **SHA-256 integrity** | ${{ github.event.inputs.expected_sha256 != '' && '✅ Verified' || '—  (no expected hash provided)' }} |
+            | **Antivirus (ClamAV)** | ${{ steps.clamav.outputs.scan_status }} — ${{ steps.clamav.outputs.scan_detail }} |
 
             ---
-            > _Release created automatically — [View workflow run](${{ steps.meta.outputs.run_url }})_
-          draft: false
+            > _Released by @${{ github.actor }} — [View workflow run](${{ steps.meta.outputs.run_url }})_
           make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 15. Write job summary ─────────────────────────────────────────────────
+      - name: Write job summary
+        if: always()
+        run: |
+          DRY="${{ github.event.inputs.dry_run }}"
+          TAG="${{ steps.tag.outputs.tag }}"
+          RELEASE_URL="${{ steps.release.outputs.url }}"
+
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          # $( [ "$DRY" = "true" ] && echo "🧪 Dry Run" || echo "✅ Download & Release" ) Summary
+
+          | Field | Value |
+          |---|---|
+          | **Filename** | \`${{ steps.download.outputs.filename }}\` |
+          | **MIME Type** | \`${{ steps.meta.outputs.mime }}\` |
+          | **Size** | ${{ steps.meta.outputs.size_human }} (${{ steps.meta.outputs.size_bytes }} bytes) |
+          | **Source type** | ${{ steps.resolve.outputs.source_type }} |
+          | **Downloaded at** | ${{ steps.meta.outputs.timestamp }} |
+          | **Speed** | ${{ steps.meta.outputs.speed_human }} |
+          | **Source URL** | ${{ github.event.inputs.download_url }} |
+
+          ## 🔐 Checksums
+          | Algorithm | Hash |
+          |---|---|
+          | **MD5** | \`${{ steps.meta.outputs.md5 }}\` |
+          | **SHA-1** | \`${{ steps.meta.outputs.sha1 }}\` |
+          | **SHA-256** | \`${{ steps.meta.outputs.sha256 }}\` |
+          | **SHA-512** | \`${{ steps.meta.outputs.sha512 }}\` |
+
+          ## 🛡️ Security
+          | Check | Result |
+          |---|---|
+          | **SHA-256 integrity** | ${{ github.event.inputs.expected_sha256 != '' && '✅ Verified' || '— (not provided)' }} |
+          | **Antivirus (ClamAV)** | ${{ steps.clamav.outputs.scan_status }} — ${{ steps.clamav.outputs.scan_detail }} |
+
+          EOF
+
+          if [ "$DRY" = "true" ]; then
+            echo "## 🧪 Dry Run Mode" >> "$GITHUB_STEP_SUMMARY"
+            echo "Artifact upload and release creation were **skipped**." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## 🚀 Release" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Field | Value |"                              >> "$GITHUB_STEP_SUMMARY"
+            echo "|---|---|"                                       >> "$GITHUB_STEP_SUMMARY"
+            echo "| **Tag** | \`$TAG\` |"                         >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$RELEASE_URL" ]; then
+              echo "| **Release URL** | $RELEASE_URL |"           >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      # ── 16. Discord notification ──────────────────────────────────────────────
+      - name: Notify Discord
+        if: ${{ github.event.inputs.dry_run != 'true' && github.event.inputs.discord_webhook_url != '' }}
+        run: |
+          RELEASE_URL="${{ steps.release.outputs.url }}"
+          FILE="${{ steps.download.outputs.filename }}"
+          TAG="${{ steps.tag.outputs.tag }}"
+
+          PAYLOAD=$(python3 -c "
+          import json, os
+          payload = {
+            'embeds': [{
+              'title': '📦 New Release: ' + os.environ['TAG'],
+              'url': os.environ.get('RELEASE_URL', ''),
+              'color': 5763719,
+              'fields': [
+                {'name': 'File',      'value': '\`' + os.environ['FILE'] + '\`', 'inline': True},
+                {'name': 'Size',      'value': os.environ['SIZE'],               'inline': True},
+                {'name': 'SHA-256',   'value': '\`' + os.environ['SHA256'] + '\`', 'inline': False},
+                {'name': 'Antivirus','value': os.environ['SCAN'],               'inline': True},
+                {'name': 'Source',    'value': os.environ['SOURCE_URL'],         'inline': False},
+              ],
+              'footer': {'text': 'GitHub Actions • ' + os.environ['REPO']}
+            }]
+          }
+          print(json.dumps(payload))
+          ")
+
+          curl -s -X POST \
+               -H "Content-Type: application/json" \
+               -d "$PAYLOAD" \
+               "${{ github.event.inputs.discord_webhook_url }}"
+        env:
+          TAG:        ${{ steps.tag.outputs.tag }}
+          FILE:       ${{ steps.download.outputs.filename }}
+          SIZE:       ${{ steps.meta.outputs.size_human }}
+          SHA256:     ${{ steps.meta.outputs.sha256 }}
+          SCAN:       "${{ steps.clamav.outputs.scan_status }} — ${{ steps.clamav.outputs.scan_detail }}"
+          SOURCE_URL: ${{ github.event.inputs.download_url }}
+          REPO:       ${{ github.repository }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+
+      # ── 17. Telegram notification ─────────────────────────────────────────────
+      - name: Notify Telegram
+        if: ${{ github.event.inputs.dry_run != 'true' && github.event.inputs.telegram_bot_token != '' && github.event.inputs.telegram_chat_id != '' }}
+        run: |
+          TEXT="*📦 New Release: ${{ steps.tag.outputs.tag }}*%0A"
+          TEXT+="File: \`${{ steps.download.outputs.filename }}\`%0A"
+          TEXT+="Size: ${{ steps.meta.outputs.size_human }}%0A"
+          TEXT+="SHA\-256: \`${{ steps.meta.outputs.sha256 }}\`%0A"
+          TEXT+="AV: ${{ steps.clamav.outputs.scan_status }}%0A"
+          TEXT+="[View Release](${{ steps.release.outputs.url }})"
+
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ github.event.inputs.telegram_bot_token }}/sendMessage" \
+            -d "chat_id=${{ github.event.inputs.telegram_chat_id }}" \
+            -d "text=$TEXT" \
+            -d "parse_mode=MarkdownV2"
