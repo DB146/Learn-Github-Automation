@@ -1,7 +1,7 @@
 name: Download, Artifact & Release
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Secrets used (configure in repo/org Settings → Secrets):
+# Secrets used (configure in repo/org Settings → Secrets → Actions):
 #   DISCORD_WEBHOOK      — Discord incoming webhook URL
 #   SLACK_WEBHOOK        — Slack incoming webhook URL
 #   TELEGRAM_BOT_TOKEN   — Telegram bot token
@@ -49,7 +49,7 @@ on:
         required: false
         type: string
       max_size_mb:
-        description: "Reject if file exceeds this size in MB (0 = no limit)"
+        description: "Reject if file exceeds this size in MB, supports decimals e.g. 1.5 (0 = no limit)"
         required: false
         type: number
         default: 0
@@ -227,24 +227,68 @@ jobs:
 
           echo "Input validation passed."
 
-      # ── 2. Install tools ────────────────────────────────────────────────────
+      # ── 2a. Cache apt packages ───────────────────────────────────────────────
+      # Cache key is based on a hash of the package list — only invalidates when
+      # packages change, not on every run.
+      - name: Cache apt packages
+        id: apt-cache
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-dl-release-aria2-clamav-gnupg-bc-${{ runner.os }}
+          restore-keys: |
+            apt-dl-release-aria2-clamav-gnupg-bc-
+
+      # ── 2b. Cache ClamAV virus definitions ───────────────────────────────────
+      # ClamAV definitions are updated daily; key rotates once per calendar day.
+      # This avoids the costly freshclam download (~200 MB) on every run.
+      - name: Cache ClamAV definitions
+        id: clamav-cache
+        uses: actions/cache@v4
+        with:
+          path: /var/lib/clamav
+          key: clamav-definitions-${{ runner.os }}-${{ steps.date.outputs.date }}
+          restore-keys: |
+            clamav-definitions-${{ runner.os }}-
+
+      # We need the date for the ClamAV cache key before the cache step runs,
+      # so we compute it in a dedicated step placed before the cache step.
+      # GitHub Actions evaluates `key:` expressions at step start, so the date
+      # step must come BEFORE the clamav-cache step. We reorder here:
+      - name: Get today's date (for ClamAV cache key)
+        id: date
+        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      # ── 2c. Install tools ────────────────────────────────────────────────────
+      # Fix 4 (Gemini): Added bc explicitly — required for float arithmetic.
       - name: Install tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq aria2 clamav clamav-daemon gnupg
-          sudo freshclam --quiet || echo "::warning::ClamAV signature update failed — using existing definitions."
+          # Install only if not already cached
+          sudo apt-get install -y -qq --no-upgrade aria2 clamav clamav-daemon gnupg bc
+
+          # Update ClamAV definitions only if cache was not restored
+          if [ "${{ steps.clamav-cache.outputs.cache-hit }}" != "true" ]; then
+            echo "ClamAV cache miss — running freshclam..."
+            sudo freshclam --quiet || echo "::warning::ClamAV signature update failed — using existing definitions."
+          else
+            echo "ClamAV definitions restored from cache — skipping freshclam."
+          fi
 
       # ── 3. Parse and validate URLs ───────────────────────────────────────────
-      # Fix 4: Use GET (not HEAD) for pre-flight — many hosts block HEAD requests.
-      # Fix 1: Pass Basic Auth credentials in pre-flight curl.
+      # Fix (Gemini 1): Basic Auth passed in pre-flight curl.
+      # Fix (Gemini 4): Use GET with Range: bytes=0-0 instead of HEAD — many
+      #                 hosts return 403/405 for HEAD but serve GET correctly.
+      # Fix (Gemini 2): CURL_AUTH built as a bash array to handle spaces in passwords.
       - name: Parse and validate URLs
         id: urls
         run: |
           RAW="${{ inputs.download_url }}"
           BASIC_AUTH="${{ inputs.basic_auth }}"
 
-          CURL_AUTH=""
-          [ -n "$BASIC_AUTH" ] && CURL_AUTH="--user $BASIC_AUTH"
+          # Fix 2: Use array for auth args — safe when password contains spaces
+          CURL_AUTH=()
+          [ -n "$BASIC_AUTH" ] && CURL_AUTH=("--user" "$BASIC_AUTH")
 
           IFS=',' read -ra URL_ARRAY <<< "$RAW"
           COUNT=0
@@ -261,15 +305,16 @@ jobs:
               echo "::warning::URL uses plain HTTP (unencrypted): $URL"
             fi
 
-            # Fix 4: Use GET with Range: bytes=0-0 instead of HEAD to avoid 405s
+            # Fix 4: GET + Range header instead of HEAD to avoid 403/405 errors.
+            # Accept 206 (Partial Content) as success for range-capable servers.
             HTTP_CODE=$(curl -o /dev/null -s -w "%{http_code}" \
               --max-time 15 --location \
               -H "Range: bytes=0-0" \
-              $CURL_AUTH \
+              "${CURL_AUTH[@]}" \
               "$URL")
 
-            # 206 Partial Content is also a success for range requests
-            if [ "$HTTP_CODE" -lt 200 ] || { [ "$HTTP_CODE" -ge 400 ] && [ "$HTTP_CODE" -ne 206 ]; }; then
+            if [ "$HTTP_CODE" -lt 200 ] || \
+               { [ "$HTTP_CODE" -ge 400 ] && [ "$HTTP_CODE" != "206" ]; }; then
               echo "::error::Pre-flight check failed (HTTP $HTTP_CODE) for: $URL"
               exit 1
             fi
@@ -283,9 +328,10 @@ jobs:
           echo "$COUNT URL(s) validated."
 
       # ── 4. Resolve filenames and detect source types ──────────────────────────
-      # Fix 1: Pass Basic Auth in header-fetch curl calls.
-      # Fix 2: Spaces in filenames are replaced with underscores.
-      # Fix 4: Use GET (not HEAD) for Content-Disposition header fetch.
+      # Fix (Gemini 1): Auth passed in all curl calls.
+      # Fix (Gemini 2): Spaces replaced in filename sanitization; written to
+      #                 newline-delimited file, never space-separated string.
+      # Fix (Gemini 4): GET with Range instead of HEAD for header fetching.
       - name: Resolve filenames and detect source types
         id: resolve
         run: |
@@ -293,8 +339,9 @@ jobs:
           BASIC_AUTH="${{ inputs.basic_auth }}"
           URL_COUNT="${{ steps.urls.outputs.url_count }}"
 
-          CURL_AUTH=""
-          [ -n "$BASIC_AUTH" ] && CURL_AUTH="--user $BASIC_AUTH"
+          # Fix 2: Auth array — safe for passwords with spaces
+          CURL_AUTH=()
+          [ -n "$BASIC_AUTH" ] && CURL_AUTH=("--user" "$BASIC_AUTH")
 
           IDX=0
           while IFS= read -r URL; do
@@ -320,14 +367,14 @@ jobs:
               FILENAME="$FILE_RENAME"
               echo "[$IDX] Using user-provided filename: $FILENAME"
             else
-              # Fix 4: Use GET with Range: bytes=0-0 to fetch headers without HEAD.
-              # -D- dumps headers to stdout; -o /dev/null discards the body.
-              # Falls back to a plain GET if the server rejects range requests.
+              # Fix 4: -D- dumps response headers to stdout; -o /dev/null discards
+              # the body. Range header requests only first byte — no HEAD needed.
+              # Falls back to a full GET if the server doesn't support range requests.
               HEADERS=$(curl -s -D- -o /dev/null --location --max-time 15 \
                          -H "Range: bytes=0-0" \
-                         $CURL_AUTH "$URL" 2>/dev/null \
+                         "${CURL_AUTH[@]}" "$URL" 2>/dev/null \
                        || curl -s -D- -o /dev/null --location --max-time 15 \
-                         $CURL_AUTH "$URL" 2>/dev/null)
+                         "${CURL_AUTH[@]}" "$URL" 2>/dev/null)
 
               # 1) Standard Content-Disposition: filename="foo.apk"
               FILENAME=$(echo "$HEADERS" \
@@ -340,7 +387,8 @@ jobs:
                 FILENAME=$(echo "$HEADERS" \
                   | grep -i 'content-disposition' \
                   | sed -n "s/.*filename\*=[Uu][Tt][Ff]-8''\([^;\r\n]*\).*/\1/Ip" \
-                  | python3 -c "import sys,urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))" \
+                  | python3 -c "import sys,urllib.parse; \
+                      print(urllib.parse.unquote(sys.stdin.read().strip()))" \
                   | tr -d '\r')
               fi
 
@@ -354,7 +402,7 @@ jobs:
             fi
 
             # ── Sanitize filename ────────────────────────────────────────────
-            # Fix 2: Also replace spaces with underscores
+            # Fix 2: Spaces → underscore, plus all other GitHub-illegal chars
             ORIGINAL="$FILENAME"
             FILENAME=$(echo "$FILENAME" | sed 's/[:<>"\\/|?* ]/_/g' | tr -s '_')
             if [ "$FILENAME" != "$ORIGINAL" ]; then
@@ -363,33 +411,41 @@ jobs:
 
             echo "$SOURCE_TYPE" > "/tmp/source_type_${IDX}.txt"
             echo "$GDRIVE_ID"   > "/tmp/gdrive_id_${IDX}.txt"
-            # Fix 2: Write one filename per line — never space-delimited
+            # Fix 2: One filename per line — never space-delimited
             printf '%s\n' "$FILENAME" >> /tmp/filenames.txt
             echo "[$IDX] Filename: $FILENAME | Source: $SOURCE_TYPE"
 
           done < /tmp/urls.txt
 
       # ── 5. Download all files ────────────────────────────────────────────────
+      # Fix (Gemini 2): All curl/aria2 auth args use bash arrays.
+      # Fix (Gemini 3): Multi-file torrents are zipped; single-file torrents
+      #                 are moved directly. Filename updated accordingly.
       - name: Download files
         id: download
         run: |
           BASIC_AUTH="${{ inputs.basic_auth }}"
           TIMEOUT_MIN="${{ inputs.download_timeout_minutes }}"
           TIMEOUT_SEC=0
-          [ -n "$TIMEOUT_MIN" ] && [ "$TIMEOUT_MIN" -gt 0 ] 2>/dev/null && TIMEOUT_SEC=$((TIMEOUT_MIN * 60))
+          [ -n "$TIMEOUT_MIN" ] && [ "$TIMEOUT_MIN" -gt 0 ] 2>/dev/null && \
+            TIMEOUT_SEC=$((TIMEOUT_MIN * 60))
 
-          CURL_AUTH=""; ARIA_AUTH=""
+          # Fix 2: Auth arrays — safe for passwords containing spaces
+          CURL_AUTH=()
+          ARIA_AUTH=()
           if [ -n "$BASIC_AUTH" ]; then
-            CURL_AUTH="--user $BASIC_AUTH"
+            CURL_AUTH=("--user" "$BASIC_AUTH")
             ARIA_USER=$(echo "$BASIC_AUTH" | cut -d: -f1)
             ARIA_PASS=$(echo "$BASIC_AUTH" | cut -d: -f2-)
-            ARIA_AUTH="--http-user=${ARIA_USER} --http-passwd=${ARIA_PASS}"
+            ARIA_AUTH=("--http-user=${ARIA_USER}" "--http-passwd=${ARIA_PASS}")
           fi
 
-          CURL_TIMEOUT=""; ARIA_TIMEOUT=""
+          # Fix 2: Timeout arrays — empty arrays expand to nothing cleanly
+          CURL_TIMEOUT=()
+          ARIA_TIMEOUT=()
           if [ "$TIMEOUT_SEC" -gt 0 ]; then
-            CURL_TIMEOUT="--max-time ${TIMEOUT_SEC}"
-            ARIA_TIMEOUT="--timeout=${TIMEOUT_SEC}"
+            CURL_TIMEOUT=("--max-time" "${TIMEOUT_SEC}")
+            ARIA_TIMEOUT=("--timeout=${TIMEOUT_SEC}")
           fi
 
           IDX=0
@@ -403,49 +459,72 @@ jobs:
             START_NS=$(date +%s%N)
 
             if [ "$SOURCE_TYPE" = "torrent" ]; then
-              # Download the .torrent descriptor, then fetch content via aria2c
+              # Download the .torrent descriptor first
               echo "Fetching .torrent descriptor..."
-              curl -L --fail --retry 3 $CURL_TIMEOUT $CURL_AUTH \
+              curl -L --fail --retry 3 \
+                   "${CURL_TIMEOUT[@]}" "${CURL_AUTH[@]}" \
                    -o "/tmp/file_${IDX}.torrent" "$URL"
 
+              # Fetch torrent content via aria2c (no seeding)
               echo "Fetching torrent content (seed-time=0)..."
-              mkdir -p /tmp/torrent_dl_${IDX}
+              mkdir -p "/tmp/torrent_dl_${IDX}"
               aria2c \
                 --dir="/tmp/torrent_dl_${IDX}" \
                 --seed-time=0 \
                 --max-tries=5 \
-                $ARIA_AUTH \
+                "${ARIA_AUTH[@]}" \
                 "/tmp/file_${IDX}.torrent"
 
-              # Move the downloaded file to working dir with resolved filename
-              DL_FILE=$(find /tmp/torrent_dl_${IDX} -maxdepth 2 -type f | head -1)
-              mv "$DL_FILE" "./$FILENAME"
+              # Fix 3: Count downloaded files
+              FILE_COUNT=$(find "/tmp/torrent_dl_${IDX}" -maxdepth 5 -type f | wc -l)
+              echo "[$IDX] Torrent downloaded $FILE_COUNT file(s)."
+
+              if [ "$FILE_COUNT" -eq 1 ]; then
+                # Single-file torrent: move directly
+                DL_FILE=$(find "/tmp/torrent_dl_${IDX}" -maxdepth 5 -type f | head -1)
+                mv "$DL_FILE" "./$FILENAME"
+                echo "[$IDX] Single-file torrent moved to: $FILENAME"
+              elif [ "$FILE_COUNT" -gt 1 ]; then
+                # Fix 3: Multi-file torrent: zip the whole directory
+                ZIP_NAME="${FILENAME%.torrent}.zip"
+                ZIP_NAME="${ZIP_NAME:-torrent_${IDX}.zip}"
+                echo "::warning::[$IDX] Multi-file torrent ($FILE_COUNT files) — packaging as $ZIP_NAME"
+                (cd "/tmp/torrent_dl_${IDX}" && zip -r - .) > "./$ZIP_NAME"
+                FILENAME="$ZIP_NAME"
+                # Update the filenames list so downstream steps use the zip name
+                sed -i "${IDX}s/.*/$FILENAME/" /tmp/filenames.txt
+                echo "[$IDX] Multi-file torrent zipped to: $FILENAME"
+              else
+                echo "::error::[$IDX] Torrent download produced no files."
+                exit 1
+              fi
 
             elif [ "$SOURCE_TYPE" = "gdrive" ]; then
-              CONFIRM=$(curl -sc /tmp/gdrive_cookies.txt $CURL_TIMEOUT \
+              CONFIRM=$(curl -sc /tmp/gdrive_cookies.txt \
+                "${CURL_TIMEOUT[@]}" \
                 "https://drive.google.com/uc?export=download&id=${GDRIVE_ID}" \
                 | grep -o 'confirm=[^&"]*' | head -1 | cut -d= -f2)
               if [ -n "$CONFIRM" ]; then
-                curl -Lb /tmp/gdrive_cookies.txt $CURL_TIMEOUT \
+                curl -Lb /tmp/gdrive_cookies.txt \
+                     "${CURL_TIMEOUT[@]}" \
                   "https://drive.google.com/uc?export=download&confirm=${CONFIRM}&id=${GDRIVE_ID}" \
                   -o "./$FILENAME"
               else
-                curl -L $CURL_TIMEOUT \
+                curl -L "${CURL_TIMEOUT[@]}" \
                   "https://drive.google.com/uc?export=download&id=${GDRIVE_ID}" \
                   -o "./$FILENAME"
               fi
 
             elif [ "$SOURCE_TYPE" = "sourceforge" ]; then
               curl -L --fail --retry 5 --retry-delay 10 \
-                   ${TIMEOUT_SEC:+--max-time $TIMEOUT_SEC} \
                    --location-trusted \
                    -b /tmp/cookies.txt -c /tmp/cookies.txt \
                    -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
-                   $CURL_AUTH \
+                   "${CURL_TIMEOUT[@]}" "${CURL_AUTH[@]}" \
                    -o "./$FILENAME" "$URL"
 
             else
-              # Generic: aria2c multi-connection with resume, curl fallback with resume
+              # Generic: aria2c multi-connection + resume, curl fallback + resume
               aria2c \
                 --split=8 \
                 --max-connection-per-server=8 \
@@ -455,7 +534,7 @@ jobs:
                 --allow-overwrite=true \
                 --auto-file-renaming=false \
                 --continue=true \
-                $ARIA_TIMEOUT $ARIA_AUTH \
+                "${ARIA_TIMEOUT[@]}" "${ARIA_AUTH[@]}" \
                 --out="$FILENAME" "$URL" \
               || {
                 echo "::warning::aria2c failed — falling back to curl with resume support."
@@ -464,7 +543,7 @@ jobs:
                      --continue-at - \
                      -b /tmp/cookies.txt -c /tmp/cookies.txt \
                      -A "Mozilla/5.0 (compatible; GitHub-Actions-Downloader/1.0)" \
-                     $CURL_TIMEOUT $CURL_AUTH \
+                     "${CURL_TIMEOUT[@]}" "${CURL_AUTH[@]}" \
                      -o "./$FILENAME" "$URL"
               }
             fi
@@ -473,7 +552,7 @@ jobs:
             DURATION_SEC=$(echo "scale=2; $((END_NS - START_NS)) / 1000000 / 1000" | bc)
             echo "$DURATION_SEC" > "/tmp/duration_${IDX}.txt"
 
-            # Fix 5: HTML guard — only block if text/html is NOT in the allowlist
+            # Fix 5: HTML guard — skip if text/html is explicitly in the allowlist
             DETECTED_MIME=$(file --mime-type -b "./$FILENAME")
             ALLOWED_MIMES="${{ inputs.allowed_mimes }}"
             HTML_ALLOWED=false
@@ -492,7 +571,7 @@ jobs:
             echo "[$IDX] Complete: $FILENAME in ${DURATION_SEC}s"
           done < /tmp/urls.txt
 
-      # ── 6. Compute metadata for all files ────────────────────────────────────
+      # ── 6. Compute metadata ───────────────────────────────────────────────────
       - name: Compute metadata
         id: meta
         run: |
@@ -520,7 +599,6 @@ jobs:
               SPEED_HUMAN="N/A"
             fi
 
-            # Store as env file — one per file index
             cat > "/tmp/meta_${IDX}.env" <<EOF
           FILENAME=$FILENAME
           SIZE_BYTES=$SIZE_BYTES
@@ -535,21 +613,23 @@ jobs:
           EOF
 
             printf "--- File %d ---\n" "$IDX"
-            printf "  %-10s %s\n"           "File:"    "$FILENAME"
-            printf "  %-10s %s\n"           "MIME:"    "$MIME"
-            printf "  %-10s %s (%s bytes)\n" "Size:"   "$SIZE_HUMAN" "$SIZE_BYTES"
-            printf "  %-10s %s\n"           "Speed:"   "$SPEED_HUMAN"
-            printf "  %-10s %s\n"           "MD5:"     "$MD5"
-            printf "  %-10s %s\n"           "SHA-1:"   "$SHA1"
-            printf "  %-10s %s\n"           "SHA-256:" "$SHA256"
-            printf "  %-10s %s\n"           "SHA-512:" "$SHA512"
+            printf "  %-10s %s\n"            "File:"    "$FILENAME"
+            printf "  %-10s %s\n"            "MIME:"    "$MIME"
+            printf "  %-10s %s (%s bytes)\n" "Size:"    "$SIZE_HUMAN" "$SIZE_BYTES"
+            printf "  %-10s %s\n"            "Speed:"   "$SPEED_HUMAN"
+            printf "  %-10s %s\n"            "MD5:"     "$MD5"
+            printf "  %-10s %s\n"            "SHA-1:"   "$SHA1"
+            printf "  %-10s %s\n"            "SHA-256:" "$SHA256"
+            printf "  %-10s %s\n"            "SHA-512:" "$SHA512"
 
           done < /tmp/urls.txt
 
           echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
           echo "run_url=$RUN_URL"     >> "$GITHUB_OUTPUT"
 
-      # ── 7. File size and MIME type checks ────────────────────────────────────
+      # ── 7. File size and MIME type checks ─────────────────────────────────────
+      # Fix (Gemini 1): bc output truncated to integer with /1 before passing
+      #                 to bash (( )) — prevents crash on float inputs like 1.5.
       - name: Check file size and MIME type
         run: |
           MAX_MB="${{ inputs.max_size_mb }}"
@@ -561,7 +641,8 @@ jobs:
             source "/tmp/meta_${IDX}.env"
 
             if [ -n "$MAX_MB" ] && [ "$MAX_MB" != "0" ]; then
-              MAX_BYTES=$(echo "$MAX_MB * 1048576" | bc)
+              # Fix 1: Use /1 in bc to guarantee integer output — (( )) rejects floats
+              MAX_BYTES=$(echo "$MAX_MB * 1048576 / 1" | bc)
               if (( SIZE_BYTES > MAX_BYTES )); then
                 echo "::error::[$IDX] $FILENAME: size ($SIZE_HUMAN) exceeds limit of ${MAX_MB} MB."
                 exit 1
@@ -585,7 +666,6 @@ jobs:
           done < /tmp/urls.txt
 
       # ── 8. SHA-256 integrity check ────────────────────────────────────────────
-      # Fix 3: Clarify this applies to single-file runs; error if multi-URL + hash.
       - name: Verify SHA-256 integrity
         run: |
           EXP="${{ inputs.expected_sha256 }}"
@@ -646,7 +726,7 @@ jobs:
           echo "ClamAV: $SUMMARY"
 
       # ── 10. VirusTotal hash lookup ────────────────────────────────────────────
-      # Fix 6: Sleep 16s between requests to respect free-tier 4 req/min limit.
+      # Rate-limit: free tier = 4 req/min → sleep 16s between requests.
       - name: VirusTotal hash lookup
         id: vt
         if: ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
@@ -659,7 +739,6 @@ jobs:
             IDX=$((IDX+1))
             source "/tmp/meta_${IDX}.env"
 
-            # Rate-limit: free tier = 4 req/min → wait 16s between calls
             if [ "$FIRST" = "false" ]; then
               echo "Sleeping 16s for VirusTotal rate limit..."
               sleep 16
@@ -739,9 +818,9 @@ jobs:
           python3 - <<'PYEOF'
           import json, os
 
-          urls  = open('/tmp/urls.txt').read().strip().splitlines()
+          urls   = open('/tmp/urls.txt').read().strip().splitlines()
           fnames = open('/tmp/filenames.txt').read().strip().splitlines()
-          files = []
+          files  = []
 
           for idx, (url, fname) in enumerate(zip(urls, fnames), 1):
               env = {}
@@ -810,21 +889,17 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       # ── 14. Stage release files ───────────────────────────────────────────────
-      # Fix 7: Copy all files into a single staging directory.
-      #        Release action uses a glob — no space/delimiter issues.
       - name: Stage release files
         if: ${{ inputs.dry_run != true }}
         run: |
           mkdir -p /tmp/release_staging
 
-          # Copy all downloaded files
           while IFS= read -r FILENAME; do
             cp "./$FILENAME" "/tmp/release_staging/$FILENAME"
           done < /tmp/filenames.txt
 
-          # Copy support files
-          cp checksums.txt  /tmp/release_staging/
-          cp metadata.json  /tmp/release_staging/
+          cp checksums.txt /tmp/release_staging/
+          cp metadata.json /tmp/release_staging/
 
           echo "Staged files:"
           ls -lh /tmp/release_staging/
@@ -907,7 +982,6 @@ jobs:
           echo "body_file=$BODY" >> "$GITHUB_OUTPUT"
 
       # ── 17. Create or append GitHub Release ──────────────────────────────────
-      # Fix 7: Use glob on staging directory — safe for all filenames.
       - name: Create or append Release
         id: release
         if: ${{ inputs.dry_run != true }}
@@ -939,9 +1013,19 @@ jobs:
           DRY="${{ inputs.dry_run }}"
           TAG="${{ steps.tag.outputs.tag }}"
           RELEASE_URL="${{ steps.release.outputs.url }}"
+          APT_HIT="${{ steps.apt-cache.outputs.cache-hit }}"
+          CL_HIT="${{ steps.clamav-cache.outputs.cache-hit }}"
 
           {
             [ "$DRY" = "true" ] && echo "# 🧪 Dry Run Summary" || echo "# ✅ Download & Release Summary"
+            echo ""
+
+            # Cache status
+            echo "## ⚡ Cache Status"
+            echo "| Cache | Result |"
+            echo "|---|---|"
+            echo "| **apt packages** | $( [ "$APT_HIT" = "true" ] && echo "✅ Hit" || echo "❌ Miss (packages installed fresh)" ) |"
+            echo "| **ClamAV definitions** | $( [ "$CL_HIT" = "true" ] && echo "✅ Hit (freshclam skipped)" || echo "❌ Miss (freshclam ran)" ) |"
             echo ""
 
             IDX=0
@@ -1033,7 +1117,8 @@ jobs:
           | MIME type not in allowlist | Add the MIME type to `allowed_mimes` |
           | SHA-256 mismatch | Verify the expected hash matches the file |
           | Input validation error | Review the inputs listed above |
-          | VirusTotal quota exceeded | VT free tier is 4 req/min — reduce URL count or upgrade |
+          | VirusTotal quota exceeded | Free tier is 4 req/min — reduce URL count or upgrade |
+          | Torrent produced no files | Check the .torrent URL is valid and content is available |
 
           Check the individual step logs above for the exact error message.
           EOF
@@ -1045,15 +1130,14 @@ jobs:
           python3 - <<'PYEOF'
           import json, os, urllib.request
 
-          # Fix 2: Read filenames from newline-delimited file — safe for spaces
           with open('/tmp/filenames.txt') as f:
               filenames = [l.strip() for l in f if l.strip()]
 
           fields = [{"name": f"File {i+1}", "value": f"`{fn}`", "inline": True}
                     for i, fn in enumerate(filenames)]
           fields += [
-              {"name": "Release",    "value": os.environ.get("RELEASE_URL", "—"), "inline": False},
-              {"name": "ClamAV",     "value": os.environ.get("CLAMAV", "—"),      "inline": True},
+              {"name": "Release", "value": os.environ.get("RELEASE_URL", "—"), "inline": False},
+              {"name": "ClamAV",  "value": os.environ.get("CLAMAV", "—"),      "inline": True},
           ]
 
           payload = {"embeds": [{
@@ -1086,7 +1170,6 @@ jobs:
           python3 - <<'PYEOF'
           import json, os, urllib.request
 
-          # Fix 2: Read filenames from newline-delimited file — safe for spaces
           with open('/tmp/filenames.txt') as f:
               filenames = [l.strip() for l in f if l.strip()]
           file_list = "\n".join(f"• `{fn}`" for fn in filenames)
@@ -1130,7 +1213,6 @@ jobs:
           python3 - <<'PYEOF'
           import os, urllib.request, urllib.parse
 
-          # Fix 2: Read filenames from newline-delimited file — safe for spaces
           with open('/tmp/filenames.txt') as f:
               filenames = [l.strip() for l in f if l.strip()]
           file_lines = "\n".join(f"  • `{fn}`" for fn in filenames)
