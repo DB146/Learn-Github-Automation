@@ -1,101 +1,271 @@
-name: Download and Release File
+name: Download, Artifact & Release
 
 on:
   workflow_dispatch:
     inputs:
-      direct_url:
-        description: 'Direct download link of the file'
+      download_url:
+        description: "Direct download URL"
         required: true
         type: string
-      tag_name:
-        description: 'Release tag (e.g., v1.0.0)'
+      release_tag:
+        description: "Release tag (e.g. v1.0.0)"
         required: true
         type: string
       release_name:
-        description: 'Release name'
-        required: true
+        description: "Release title (optional, defaults to tag)"
+        required: false
         type: string
-        default: 'Automated Download Release'
+      expected_sha256:
+        description: "Expected SHA-256 hash for integrity check (optional)"
+        required: false
+        type: string
+      prerelease:
+        description: "Mark as pre-release?"
+        required: false
+        type: boolean
+        default: false
+      artifact_retention_days:
+        description: "Artifact retention in days (1–90)"
+        required: false
+        type: number
+        default: 90
 
 jobs:
   download-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # This permission is required to create a GitHub Release
+      contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # ── 1. Validate URL ─────────────────────────────────────────────────────
+      - name: Validate URL
+        run: |
+          URL="${{ github.event.inputs.download_url }}"
 
-      - name: Download File
+          # Reject non-http(s) schemes entirely
+          if [[ ! "$URL" =~ ^https?:// ]]; then
+            echo "::error::URL must start with http:// or https://. Got: $URL"
+            exit 1
+          fi
+
+          # Warn (but do not fail) for plain HTTP
+          if [[ "$URL" =~ ^http:// ]]; then
+            echo "::warning::The provided URL uses plain HTTP, which is unencrypted. Consider using HTTPS if available."
+          fi
+
+          # Check the URL is reachable before wasting time on a full download
+          HTTP_CODE=$(curl -o /dev/null -sI -w "%{http_code}" --max-time 15 --location "$URL")
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::URL pre-flight check failed — server returned HTTP $HTTP_CODE for: $URL"
+            exit 1
+          fi
+
+          echo "URL pre-flight check passed (HTTP $HTTP_CODE)."
+
+      # ── 2. Download the file, preserving original filename ──────────────────
+      - name: Download file
         id: download
-        env:
-          DIRECT_URL: ${{ inputs.direct_url }}
         run: |
-          # Create a clean directory for our download
-          mkdir -p download_dir
-          cd download_dir
-          
-          echo "Downloading from: $DIRECT_URL"
-          
-          # curl -L (follow redirects) -J (use server-provided filename) -O (save file)
-          curl -S -L -J -O "$DIRECT_URL"
-          
-          # Get the exact filename that was saved
-          FILENAME=$(ls -1 | head -n 1)
-          
-          # Pass the filename to the next steps via GITHUB_ENV
-          echo "filename=$FILENAME" >> $GITHUB_ENV
-          echo "Successfully downloaded: $FILENAME"
+          URL="${{ github.event.inputs.download_url }}"
 
-      - name: Generate File Information (MD5, SHA256, Size)
-        id: info
-        env:
-          DIRECT_URL: ${{ inputs.direct_url }}
+          # ── Resolve filename ────────────────────────────────────────────────
+          # 1) Try standard Content-Disposition: filename="foo.apk"
+          FILENAME=$(
+            curl -sI --location "$URL" \
+              | grep -i 'content-disposition' \
+              | sed -n 's/.*filename[^;=\n]*=\s*["\x27]\?\([^"\x27;\r\n]*\).*/\1/Ip' \
+              | tr -d '\r'
+          )
+
+          # 2) Try RFC 5987 encoded: filename*=UTF-8''foo%20bar.apk
+          if [ -z "$FILENAME" ]; then
+            FILENAME=$(
+              curl -sI --location "$URL" \
+                | grep -i 'content-disposition' \
+                | sed -n "s/.*filename\*=[Uu][Tt][Ff]-8''\([^;\r\n]*\).*/\1/Ip" \
+                | python3 -c "import sys, urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))" \
+                | tr -d '\r'
+            )
+          fi
+
+          # 3) Fall back to URL path basename (strip query string)
+          if [ -z "$FILENAME" ]; then
+            FILENAME=$(basename "$(echo "$URL" | cut -d'?' -f1)")
+          fi
+
+          # 4) Last-resort default
+          FILENAME="${FILENAME:-downloaded_file}"
+
+          echo "Resolved filename: $FILENAME"
+
+          # ── Download ────────────────────────────────────────────────────────
+          START_TIME=$(date +%s%N)
+
+          curl -L --fail --retry 3 --retry-delay 5 \
+               --location-trusted \
+               -b /tmp/cookies.txt -c /tmp/cookies.txt \
+               -A "Mozilla/5.0 (compatible; GitHub-Actions-Downloader/1.0)" \
+               -o "$FILENAME" "$URL"
+
+          END_TIME=$(date +%s%N)
+          DURATION_MS=$(( (END_TIME - START_TIME) / 1000000 ))
+          DURATION_SEC=$(echo "scale=2; $DURATION_MS / 1000" | bc)
+
+          # ── HTML-page detection ─────────────────────────────────────────────
+          DETECTED_MIME=$(file --mime-type -b "$FILENAME")
+          if [[ "$DETECTED_MIME" == "text/html" ]]; then
+            echo "::error::Downloaded file appears to be an HTML page (MIME: $DETECTED_MIME). The URL may require authentication, redirect through a landing page, or the link may have expired."
+            echo "--- First 500 bytes of received content ---"
+            head -c 500 "$FILENAME"
+            exit 1
+          fi
+
+          echo "filename=$FILENAME"         >> "$GITHUB_OUTPUT"
+          echo "duration_sec=$DURATION_SEC" >> "$GITHUB_OUTPUT"
+          echo "Download complete in ${DURATION_SEC}s."
+
+      # ── 3. Compute metadata ─────────────────────────────────────────────────
+      - name: Compute file metadata
+        id: meta
         run: |
-          cd download_dir
-          FILE="${{ env.filename }}"
-          
-          # Calculate Sizes
+          FILE="${{ steps.download.outputs.filename }}"
+
           SIZE_BYTES=$(stat -c%s "$FILE")
-          SIZE_HUMAN=$(ls -lh "$FILE" | awk '{print $5}')
-          
-          # Calculate Hashes
-          MD5_HASH=$(md5sum "$FILE" | awk '{print $1}')
-          SHA1_HASH=$(sha1sum "$FILE" | awk '{print $1}')
-          SHA256_HASH=$(sha256sum "$FILE" | awk '{print $1}')
-          
-          # Create the markdown template for the GitHub Release body
-          cat <<EOF > ../release_body.md
-          ## Release Information
-          
-          This file was automatically downloaded and packaged.
-          
-          - **Source URL:** [Direct Download Link]($DIRECT_URL)
-          - **Filename:** \`$FILE\`
-          - **File Size:** $SIZE_HUMAN ($SIZE_BYTES bytes)
-          
-          ### Security / Checksums
-          
-          | Hash Algorithm | Hash Value |
-          | --- | --- |
-          | **MD5** | \`$MD5_HASH\` |
-          | **SHA-1** | \`$SHA1_HASH\` |
-          | **SHA-256** | \`$SHA256_HASH\` |
-          EOF
-          
-          echo "Generated release notes:"
-          cat ../release_body.md
+          SIZE_HUMAN=$(numfmt --to=iec-i --suffix=B "$SIZE_BYTES")
+          MD5=$(md5sum       "$FILE" | awk '{print $1}')
+          SHA1=$(sha1sum     "$FILE" | awk '{print $1}')
+          SHA256=$(sha256sum "$FILE" | awk '{print $1}')
+          SHA512=$(sha512sum "$FILE" | awk '{print $1}')
+          MIME=$(file --mime-type -b "$FILE")
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-      - name: Create GitHub Release and Upload Asset
+          # ── Download speed ──────────────────────────────────────────────────
+          DURATION="${{ steps.download.outputs.duration_sec }}"
+          if (( $(echo "$DURATION > 0" | bc -l) )); then
+            SPEED_BPS=$(echo "scale=0; $SIZE_BYTES / $DURATION" | bc)
+            SPEED_HUMAN=$(numfmt --to=iec-i --suffix=B/s "$SPEED_BPS")
+          else
+            SPEED_HUMAN="N/A"
+          fi
+
+          echo "size_bytes=$SIZE_BYTES"   >> "$GITHUB_OUTPUT"
+          echo "size_human=$SIZE_HUMAN"   >> "$GITHUB_OUTPUT"
+          echo "md5=$MD5"                 >> "$GITHUB_OUTPUT"
+          echo "sha1=$SHA1"               >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256"           >> "$GITHUB_OUTPUT"
+          echo "sha512=$SHA512"           >> "$GITHUB_OUTPUT"
+          echo "mime=$MIME"               >> "$GITHUB_OUTPUT"
+          echo "timestamp=$TIMESTAMP"     >> "$GITHUB_OUTPUT"
+          echo "speed_human=$SPEED_HUMAN" >> "$GITHUB_OUTPUT"
+          echo "run_url=$RUN_URL"         >> "$GITHUB_OUTPUT"
+
+          echo "--- Metadata ---"
+          echo "File       : $FILE"
+          echo "MIME type  : $MIME"
+          echo "Size       : $SIZE_BYTES bytes ($SIZE_HUMAN)"
+          echo "Speed      : $SPEED_HUMAN"
+          echo "MD5        : $MD5"
+          echo "SHA-1      : $SHA1"
+          echo "SHA-256    : $SHA256"
+          echo "SHA-512    : $SHA512"
+          echo "Downloaded : $TIMESTAMP"
+
+      # ── 4. Verify integrity (optional) ──────────────────────────────────────
+      - name: Verify SHA-256 integrity
+        if: ${{ github.event.inputs.expected_sha256 != '' }}
+        run: |
+          FILE="${{ steps.download.outputs.filename }}"
+          EXPECTED="${{ github.event.inputs.expected_sha256 }}"
+          ACTUAL="${{ steps.meta.outputs.sha256 }}"
+
+          # Normalize to lowercase for comparison
+          EXPECTED_LOWER=$(echo "$EXPECTED" | tr '[:upper:]' '[:lower:]')
+          ACTUAL_LOWER=$(echo "$ACTUAL"     | tr '[:upper:]' '[:lower:]')
+
+          if [ "$EXPECTED_LOWER" != "$ACTUAL_LOWER" ]; then
+            echo "::error::SHA-256 integrity check FAILED!"
+            echo "  Expected : $EXPECTED_LOWER"
+            echo "  Actual   : $ACTUAL_LOWER"
+            exit 1
+          fi
+
+          echo "SHA-256 integrity check PASSED."
+
+      # ── 5. Generate checksums.txt ────────────────────────────────────────────
+      - name: Generate checksums.txt
+        id: checksums
+        run: |
+          FILE="${{ steps.download.outputs.filename }}"
+          OUT="checksums.txt"
+
+          cat > "$OUT" <<EOF
+          # Checksums for: $FILE
+          # Generated   : ${{ steps.meta.outputs.timestamp }}
+          # Source URL  : ${{ github.event.inputs.download_url }}
+
+          MD5     ($FILE) = ${{ steps.meta.outputs.md5 }}
+          SHA1    ($FILE) = ${{ steps.meta.outputs.sha1 }}
+          SHA256  ($FILE) = ${{ steps.meta.outputs.sha256 }}
+          SHA512  ($FILE) = ${{ steps.meta.outputs.sha512 }}
+
+          # Standard sha256sum-compatible line (usable with: sha256sum -c checksums.txt)
+          ${{ steps.meta.outputs.sha256 }}  $FILE
+          EOF
+
+          echo "checksums_file=$OUT" >> "$GITHUB_OUTPUT"
+          echo "checksums.txt generated."
+
+      # ── 6. Upload as GitHub Actions artifact ────────────────────────────────
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.download.outputs.filename }}
+          path: ${{ steps.download.outputs.filename }}
+          retention-days: ${{ github.event.inputs.artifact_retention_days }}
+          if-no-files-found: error
+
+      # ── 7. Create GitHub Release with metadata in description ───────────────
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_name || github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: |
+            ${{ steps.download.outputs.filename }}
+            ${{ steps.checksums.outputs.checksums_file }}
+          body: |
+            ## 📦 File Information
+
+            | Field | Value |
+            |---|---|
+            | **Filename** | `${{ steps.download.outputs.filename }}` |
+            | **MIME Type** | `${{ steps.meta.outputs.mime }}` |
+            | **Size** | ${{ steps.meta.outputs.size_human }} (${{ steps.meta.outputs.size_bytes }} bytes) |
+            | **Downloaded at** | ${{ steps.meta.outputs.timestamp }} |
+            | **Download speed** | ${{ steps.meta.outputs.speed_human }} |
+
+            ## 🔗 Source
+
+            | Field | Value |
+            |---|---|
+            | **Original URL** | ${{ github.event.inputs.download_url }} |
+
+            ## 🔐 Checksums
+
+            | Algorithm | Hash |
+            |---|---|
+            | **MD5** | `${{ steps.meta.outputs.md5 }}` |
+            | **SHA-1** | `${{ steps.meta.outputs.sha1 }}` |
+            | **SHA-256** | `${{ steps.meta.outputs.sha256 }}` |
+            | **SHA-512** | `${{ steps.meta.outputs.sha512 }}` |
+
+            > A standalone `checksums.txt` file is also attached to this release and is compatible with `sha256sum -c checksums.txt`.
+
+            ---
+            > _Release created automatically — [View workflow run](${{ steps.meta.outputs.run_url }})_
+          draft: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ inputs.tag_name }}
-          RELEASE_NAME: ${{ inputs.release_name }}
-        run: |
-          cd download_dir
-          
-          # Use GitHub's official CLI (pre-installed on runners) to create the release
-          gh release create "$TAG_NAME" "${{ env.filename }}" \
-            --title "$RELEASE_NAME" \
-            --notes-file ../release_body.md
