@@ -1,4 +1,4 @@
-name: Download, Artifact & Releases
+name: Download, Artifact & Release
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Secrets used (configure in repo/org Settings → Secrets → Actions):
@@ -182,6 +182,13 @@ jobs:
     outputs:
       release_url: ${{ steps.release.outputs.url }}
       release_tag: ${{ steps.tag.outputs.tag }}
+
+    # Map secrets to env vars — secrets context is not allowed in step if: expressions.
+    env:
+      HAS_DISCORD:  ${{ secrets.DISCORD_WEBHOOK    != '' }}
+      HAS_SLACK:    ${{ secrets.SLACK_WEBHOOK      != '' }}
+      HAS_TELEGRAM: ${{ secrets.TELEGRAM_BOT_TOKEN != '' }}
+      HAS_VT:       ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
 
     steps:
       # ── 1. Validate inputs ───────────────────────────────────────────────────
@@ -729,7 +736,7 @@ jobs:
       # Rate-limit: free tier = 4 req/min → sleep 16s between requests.
       - name: VirusTotal hash lookup
         id: vt
-        if: ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
+        if: ${{ env.HAS_VT == 'true' }}
         run: |
           IDX=0
           SUMMARY=""
@@ -1125,7 +1132,7 @@ jobs:
 
       # ── 21. Discord notification ──────────────────────────────────────────────
       - name: Notify Discord
-        if: ${{ inputs.dry_run != true && secrets.DISCORD_WEBHOOK != '' }}
+        if: ${{ inputs.dry_run != true && env.HAS_DISCORD == 'true' }}
         run: |
           python3 - <<'PYEOF'
           import json, os, urllib.request
@@ -1165,7 +1172,7 @@ jobs:
 
       # ── 22. Slack notification ────────────────────────────────────────────────
       - name: Notify Slack
-        if: ${{ inputs.dry_run != true && secrets.SLACK_WEBHOOK != '' }}
+        if: ${{ inputs.dry_run != true && env.HAS_SLACK == 'true' }}
         run: |
           python3 - <<'PYEOF'
           import json, os, urllib.request
@@ -1208,7 +1215,7 @@ jobs:
 
       # ── 23. Telegram notification ─────────────────────────────────────────────
       - name: Notify Telegram
-        if: ${{ inputs.dry_run != true && secrets.TELEGRAM_BOT_TOKEN != '' && inputs.telegram_chat_id != '' }}
+        if: ${{ inputs.dry_run != true && env.HAS_TELEGRAM == 'true' && inputs.telegram_chat_id != '' }}
         run: |
           python3 - <<'PYEOF'
           import os, urllib.request, urllib.parse
