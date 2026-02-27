@@ -183,13 +183,6 @@ jobs:
       release_url: ${{ steps.release.outputs.url }}
       release_tag: ${{ steps.tag.outputs.tag }}
 
-    # Map secrets to env vars — secrets context is not allowed in step if: expressions.
-    env:
-      HAS_DISCORD:  ${{ secrets.DISCORD_WEBHOOK    != '' }}
-      HAS_SLACK:    ${{ secrets.SLACK_WEBHOOK      != '' }}
-      HAS_TELEGRAM: ${{ secrets.TELEGRAM_BOT_TOKEN != '' }}
-      HAS_VT:       ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
-
     steps:
       # ── 1. Validate inputs ───────────────────────────────────────────────────
       - name: Validate inputs
@@ -234,55 +227,79 @@ jobs:
 
           echo "Input validation passed."
 
-      # ── 2a. Cache apt packages ───────────────────────────────────────────────
-      # Cache key is based on a hash of the package list — only invalidates when
-      # packages change, not on every run.
-      - name: Cache apt packages
-        id: apt-cache
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: apt-dl-release-aria2-clamav-gnupg-bc-${{ runner.os }}
-          restore-keys: |
-            apt-dl-release-aria2-clamav-gnupg-bc-
+      # ── 2. Map secrets to $GITHUB_ENV flags ──────────────────────────────────
+      # Workaround: `secrets` context is forbidden in both step `if:` expressions
+      # AND job-level `env:` blocks. Writing to $GITHUB_ENV from a `run:` step is
+      # the only supported pattern — secrets ARE accessible inside `run:`.
+      - name: Check available secrets
+        run: |
+          [ -n "${{ secrets.DISCORD_WEBHOOK }}"    ] && echo "HAS_DISCORD=true"  >> "$GITHUB_ENV" || true
+          [ -n "${{ secrets.SLACK_WEBHOOK }}"      ] && echo "HAS_SLACK=true"    >> "$GITHUB_ENV" || true
+          [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && echo "HAS_TELEGRAM=true" >> "$GITHUB_ENV" || true
+          [ -n "${{ secrets.VIRUSTOTAL_API_KEY }}" ] && echo "HAS_VT=true"       >> "$GITHUB_ENV" || true
 
-      # ── 2b. Cache ClamAV virus definitions ───────────────────────────────────
-      # ClamAV definitions are updated daily; key rotates once per calendar day.
-      # This avoids the costly freshclam download (~200 MB) on every run.
-      - name: Cache ClamAV definitions
-        id: clamav-cache
-        uses: actions/cache@v4
-        with:
-          path: /var/lib/clamav
-          key: clamav-definitions-${{ runner.os }}-${{ steps.date.outputs.date }}
-          restore-keys: |
-            clamav-definitions-${{ runner.os }}-
-
-      # We need the date for the ClamAV cache key before the cache step runs,
-      # so we compute it in a dedicated step placed before the cache step.
-      # GitHub Actions evaluates `key:` expressions at step start, so the date
-      # step must come BEFORE the clamav-cache step. We reorder here:
+      # ── 3a. Get today's date (ClamAV cache key) ─────────────────────────────
+      # Must run BEFORE the cache step because actions/cache evaluates `key:`
+      # expressions at step-start time.
       - name: Get today's date (for ClamAV cache key)
         id: date
         run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
-      # ── 2c. Install tools ────────────────────────────────────────────────────
-      # Fix 4 (Gemini): Added bc explicitly — required for float arithmetic.
+      # ── 3b. Cache ClamAV virus definitions ───────────────────────────────────
+      # Fix: Cache a user-owned proxy directory (~/.clamav_db_cache) instead of
+      # the root-owned /var/lib/clamav. actions/cache runs as the runner user
+      # (UID 1001) and cannot write to system directories — doing so causes
+      # "Permission denied" failures on cache restore.
+      # Key rotates daily so definitions stay fresh.
+      - name: Cache ClamAV definitions
+        id: clamav-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.clamav_db_cache
+          key: clamav-definitions-${{ runner.os }}-${{ steps.date.outputs.date }}
+          restore-keys: |
+            clamav-definitions-${{ runner.os }}-
+
+      # ── 3c. Install tools ────────────────────────────────────────────────────
+      # Notes:
+      # - apt cache removed: GitHub mirrors are in the same DC; downloading
+      #   packages takes ~2s. Cache upload/download is slower than just installing.
+      # - bc added explicitly (required for float arithmetic throughout).
+      # - clamav-freshclam daemon is stopped before manual freshclam to prevent
+      #   "database locked by another process" errors (apt auto-starts the daemon).
+      # - ClamAV definitions are proxied through ~/.clamav_db_cache (user-owned)
+      #   and copied into /var/lib/clamav with sudo.
       - name: Install tools
         run: |
           sudo apt-get update -qq
-          # Install only if not already cached
-          sudo apt-get install -y -qq --no-upgrade aria2 clamav clamav-daemon gnupg bc
+          sudo apt-get install -y -qq aria2 clamav clamav-daemon gnupg bc
 
-          # Update ClamAV definitions only if cache was not restored
+          # Fix: Stop the auto-started freshclam daemon before doing anything
+          # with the database — otherwise it holds a lock and our freshclam fails.
+          sudo systemctl stop clamav-freshclam || true
+
+          # Restore cached definitions from user-owned proxy dir if present
+          if [ -d "$HOME/.clamav_db_cache" ] && [ "$(ls -A "$HOME/.clamav_db_cache")" ]; then
+            echo "Restoring ClamAV definitions from cache..."
+            sudo cp -r "$HOME"/.clamav_db_cache/* /var/lib/clamav/
+            sudo chown -R clamav:clamav /var/lib/clamav
+          fi
+
+          # Run freshclam only on cache miss (or if proxy dir was empty)
           if [ "${{ steps.clamav-cache.outputs.cache-hit }}" != "true" ]; then
             echo "ClamAV cache miss — running freshclam..."
             sudo freshclam --quiet || echo "::warning::ClamAV signature update failed — using existing definitions."
+
+            # Save updated definitions to user-owned proxy dir for caching
+            mkdir -p "$HOME/.clamav_db_cache"
+            sudo cp -r /var/lib/clamav/* "$HOME/.clamav_db_cache/"
+            sudo chown -R "$USER":"$USER" "$HOME/.clamav_db_cache"
+            echo "ClamAV definitions saved to cache."
           else
             echo "ClamAV definitions restored from cache — skipping freshclam."
           fi
 
-      # ── 3. Parse and validate URLs ───────────────────────────────────────────
+      # ── 4. Parse and validate URLs ───────────────────────────────────────────
       # Fix (Gemini 1): Basic Auth passed in pre-flight curl.
       # Fix (Gemini 4): Use GET with Range: bytes=0-0 instead of HEAD — many
       #                 hosts return 403/405 for HEAD but serve GET correctly.
@@ -334,7 +351,7 @@ jobs:
           echo "url_count=$COUNT" >> "$GITHUB_OUTPUT"
           echo "$COUNT URL(s) validated."
 
-      # ── 4. Resolve filenames and detect source types ──────────────────────────
+      # ── 5. Resolve filenames and detect source types ──────────────────────────
       # Fix (Gemini 1): Auth passed in all curl calls.
       # Fix (Gemini 2): Spaces replaced in filename sanitization; written to
       #                 newline-delimited file, never space-separated string.
@@ -424,7 +441,7 @@ jobs:
 
           done < /tmp/urls.txt
 
-      # ── 5. Download all files ────────────────────────────────────────────────
+      # ── 6. Download all files ────────────────────────────────────────────────
       # Fix (Gemini 2): All curl/aria2 auth args use bash arrays.
       # Fix (Gemini 3): Multi-file torrents are zipped; single-file torrents
       #                 are moved directly. Filename updated accordingly.
@@ -499,7 +516,7 @@ jobs:
                 (cd "/tmp/torrent_dl_${IDX}" && zip -r - .) > "./$ZIP_NAME"
                 FILENAME="$ZIP_NAME"
                 # Update the filenames list so downstream steps use the zip name
-                sed -i "${IDX}s/.*/$FILENAME/" /tmp/filenames.txt
+                awk -v line="$IDX" -v val="$FILENAME" 'NR==line{$0=val}1' /tmp/filenames.txt > /tmp/fn_tmp.txt && mv /tmp/fn_tmp.txt /tmp/filenames.txt
                 echo "[$IDX] Multi-file torrent zipped to: $FILENAME"
               else
                 echo "::error::[$IDX] Torrent download produced no files."
@@ -578,7 +595,7 @@ jobs:
             echo "[$IDX] Complete: $FILENAME in ${DURATION_SEC}s"
           done < /tmp/urls.txt
 
-      # ── 6. Compute metadata ───────────────────────────────────────────────────
+      # ── 7. Compute metadata ───────────────────────────────────────────────────
       - name: Compute metadata
         id: meta
         run: |
@@ -634,7 +651,7 @@ jobs:
           echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
           echo "run_url=$RUN_URL"     >> "$GITHUB_OUTPUT"
 
-      # ── 7. File size and MIME type checks ─────────────────────────────────────
+      # ── 8. File size and MIME type checks ─────────────────────────────────────
       # Fix (Gemini 1): bc output truncated to integer with /1 before passing
       #                 to bash (( )) — prevents crash on float inputs like 1.5.
       - name: Check file size and MIME type
@@ -672,7 +689,7 @@ jobs:
 
           done < /tmp/urls.txt
 
-      # ── 8. SHA-256 integrity check ────────────────────────────────────────────
+      # ── 9. SHA-256 integrity check ────────────────────────────────────────────
       - name: Verify SHA-256 integrity
         run: |
           EXP="${{ inputs.expected_sha256 }}"
@@ -708,7 +725,7 @@ jobs:
 
           echo "SHA-256 check PASSED."
 
-      # ── 9. ClamAV virus scan ─────────────────────────────────────────────────
+      # ── 10. ClamAV virus scan ─────────────────────────────────────────────────
       - name: ClamAV virus scan
         id: clamav
         run: |
@@ -732,7 +749,7 @@ jobs:
           echo "scan_summary=$SUMMARY" >> "$GITHUB_OUTPUT"
           echo "ClamAV: $SUMMARY"
 
-      # ── 10. VirusTotal hash lookup ────────────────────────────────────────────
+      # ── 11. VirusTotal hash lookup ────────────────────────────────────────────
       # Rate-limit: free tier = 4 req/min → sleep 16s between requests.
       - name: VirusTotal hash lookup
         id: vt
@@ -790,7 +807,7 @@ jobs:
 
           echo "vt_summary=$SUMMARY" >> "$GITHUB_OUTPUT"
 
-      # ── 11. Generate checksums.txt ────────────────────────────────────────────
+      # ── 12. Generate checksums.txt ────────────────────────────────────────────
       - name: Generate checksums.txt
         run: |
           {
@@ -819,7 +836,7 @@ jobs:
 
           echo "checksums.txt generated."
 
-      # ── 12. Generate metadata.json ────────────────────────────────────────────
+      # ── 13. Generate metadata.json ────────────────────────────────────────────
       - name: Generate metadata.json
         run: |
           python3 - <<'PYEOF'
@@ -884,7 +901,7 @@ jobs:
           EXP_SHA256:     ${{ inputs.expected_sha256 }}
           CLAMAV_SUMMARY: ${{ steps.clamav.outputs.scan_summary }}
 
-      # ── 13. Resolve release tag ───────────────────────────────────────────────
+      # ── 14. Resolve release tag ───────────────────────────────────────────────
       - name: Resolve release tag
         id: tag
         run: |
@@ -895,7 +912,7 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      # ── 14. Stage release files ───────────────────────────────────────────────
+      # ── 15. Stage release files ───────────────────────────────────────────────
       - name: Stage release files
         if: ${{ inputs.dry_run != true }}
         run: |
@@ -911,7 +928,7 @@ jobs:
           echo "Staged files:"
           ls -lh /tmp/release_staging/
 
-      # ── 15. Upload Actions artifact ───────────────────────────────────────────
+      # ── 16. Upload Actions artifact ───────────────────────────────────────────
       - name: Upload artifact bundle
         if: ${{ inputs.dry_run != true }}
         uses: actions/upload-artifact@v4
@@ -921,7 +938,7 @@ jobs:
           retention-days: ${{ inputs.artifact_retention_days }}
           if-no-files-found: error
 
-      # ── 16. Build release body ────────────────────────────────────────────────
+      # ── 17. Build release body ────────────────────────────────────────────────
       - name: Build release body
         id: body
         run: |
@@ -988,7 +1005,7 @@ jobs:
 
           echo "body_file=$BODY" >> "$GITHUB_OUTPUT"
 
-      # ── 17. Create or append GitHub Release ──────────────────────────────────
+      # ── 18. Create or append GitHub Release ──────────────────────────────────
       - name: Create or append Release
         id: release
         if: ${{ inputs.dry_run != true }}
@@ -1005,7 +1022,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 18. Delete artifact after release (optional) ──────────────────────────
+      # ── 19. Delete artifact after release (optional) ──────────────────────────
       - name: Delete artifact after release
         if: ${{ inputs.dry_run != true && inputs.delete_artifact_after_release == true }}
         uses: geekyeggo/delete-artifact@v5
@@ -1013,14 +1030,13 @@ jobs:
           name: release-${{ steps.tag.outputs.tag }}
           failOnError: false
 
-      # ── 19. Write job summary ─────────────────────────────────────────────────
+      # ── 20. Write job summary ─────────────────────────────────────────────────
       - name: Write job summary
         if: always()
         run: |
           DRY="${{ inputs.dry_run }}"
           TAG="${{ steps.tag.outputs.tag }}"
           RELEASE_URL="${{ steps.release.outputs.url }}"
-          APT_HIT="${{ steps.apt-cache.outputs.cache-hit }}"
           CL_HIT="${{ steps.clamav-cache.outputs.cache-hit }}"
 
           {
@@ -1031,7 +1047,6 @@ jobs:
             echo "## ⚡ Cache Status"
             echo "| Cache | Result |"
             echo "|---|---|"
-            echo "| **apt packages** | $( [ "$APT_HIT" = "true" ] && echo "✅ Hit" || echo "❌ Miss (packages installed fresh)" ) |"
             echo "| **ClamAV definitions** | $( [ "$CL_HIT" = "true" ] && echo "✅ Hit (freshclam skipped)" || echo "❌ Miss (freshclam ran)" ) |"
             echo ""
 
@@ -1106,7 +1121,7 @@ jobs:
             printf "  %-12s %s\n" "Release:" "$RELEASE_URL"
           echo "════════════════════════════════════════════════════════"
 
-      # ── 20. Write failure summary ─────────────────────────────────────────────
+      # ── 21. Write failure summary ─────────────────────────────────────────────
       - name: Write failure summary
         if: failure()
         run: |
@@ -1130,7 +1145,7 @@ jobs:
           Check the individual step logs above for the exact error message.
           EOF
 
-      # ── 21. Discord notification ──────────────────────────────────────────────
+      # ── 22. Discord notification ──────────────────────────────────────────────
       - name: Notify Discord
         if: ${{ inputs.dry_run != true && env.HAS_DISCORD == 'true' }}
         run: |
@@ -1170,7 +1185,7 @@ jobs:
           CLAMAV:          ${{ steps.clamav.outputs.scan_summary }}
           REPO:            ${{ github.repository }}
 
-      # ── 22. Slack notification ────────────────────────────────────────────────
+      # ── 23. Slack notification ────────────────────────────────────────────────
       - name: Notify Slack
         if: ${{ inputs.dry_run != true && env.HAS_SLACK == 'true' }}
         run: |
@@ -1213,7 +1228,7 @@ jobs:
           CLAMAV:        ${{ steps.clamav.outputs.scan_summary }}
           REPO:          ${{ github.repository }}
 
-      # ── 23. Telegram notification ─────────────────────────────────────────────
+      # ── 24. Telegram notification ─────────────────────────────────────────────
       - name: Notify Telegram
         if: ${{ inputs.dry_run != true && env.HAS_TELEGRAM == 'true' && inputs.telegram_chat_id != '' }}
         run: |
