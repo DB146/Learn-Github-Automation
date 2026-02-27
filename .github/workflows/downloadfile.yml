@@ -1153,11 +1153,11 @@ jobs:
           import json, os, urllib.request
 
           with open('/tmp/filenames.txt') as f:
-              filenames = [l.strip() for l in f if l.strip()]
+              filenames =[l.strip() for l in f if l.strip()]
 
-          fields = [{"name": f"File {i+1}", "value": f"`{fn}`", "inline": True}
+          fields =[{"name": f"File {i+1}", "value": f"`{fn}`", "inline": True}
                     for i, fn in enumerate(filenames)]
-          fields += [
+          fields +=[
               {"name": "Release", "value": os.environ.get("RELEASE_URL", "—"), "inline": False},
               {"name": "ClamAV",  "value": os.environ.get("CLAMAV", "—"),      "inline": True},
           ]
@@ -1170,16 +1170,16 @@ jobs:
               "footer": {"text": f"GitHub Actions • {os.environ['REPO']}"}
           }]}
 
-          req = urllib.request.Request(
-              os.environ["DISCORD_WEBHOOK"],
-              data=json.dumps(payload).encode(),
-              headers={"Content-Type": "application/json"},
-              method="POST")
           try:
-            urllib.request.urlopen(req)
-            print("Discord notification sent.")
+              req = urllib.request.Request(
+                  os.environ["DISCORD_WEBHOOK"],
+                  data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST")
+              urllib.request.urlopen(req)
+              print("Discord notification sent.")
           except Exception as e:
-            print(f"::warning::Discord notification failed (release still succeeded): {e}")
+              print(f"::warning::Discord notification failed: {e}")
           PYEOF
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
@@ -1187,7 +1187,6 @@ jobs:
           RELEASE_URL:     ${{ steps.release.outputs.url }}
           CLAMAV:          ${{ steps.clamav.outputs.scan_summary }}
           REPO:            ${{ github.repository }}
-
       # ── 23. Slack notification ────────────────────────────────────────────────
       - name: Notify Slack
         if: ${{ inputs.dry_run != true && env.HAS_SLACK == 'true' }}
@@ -1196,36 +1195,36 @@ jobs:
           import json, os, urllib.request
 
           with open('/tmp/filenames.txt') as f:
-              filenames = [l.strip() for l in f if l.strip()]
+              filenames =[l.strip() for l in f if l.strip()]
           file_list = "\n".join(f"• `{fn}`" for fn in filenames)
 
-          payload = {"blocks": [
+          payload = {"blocks":[
               {"type": "header",
                "text": {"type": "plain_text",
                         "text": f"📦 New Release: {os.environ['TAG']}"}},
               {"type": "section",
-               "fields": [
+               "fields":[
                    {"type": "mrkdwn", "text": f"*Files:*\n{file_list}"},
                    {"type": "mrkdwn", "text": f"*ClamAV:*\n{os.environ.get('CLAMAV','—')}"},
                    {"type": "mrkdwn", "text": f"*Repo:*\n{os.environ.get('REPO')}"},
                ]},
-              {"type": "actions", "elements": [{
+              {"type": "actions", "elements":[{
                   "type": "button",
                   "text": {"type": "plain_text", "text": "View Release"},
                   "url":  os.environ.get("RELEASE_URL", "")
               }]}
           ]}
 
-          req = urllib.request.Request(
-              os.environ["SLACK_WEBHOOK"],
-              data=json.dumps(payload).encode(),
-              headers={"Content-Type": "application/json"},
-              method="POST")
           try:
-            urllib.request.urlopen(req)
-            print("Slack notification sent.")
+              req = urllib.request.Request(
+                  os.environ["SLACK_WEBHOOK"],
+                  data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST")
+              urllib.request.urlopen(req)
+              print("Slack notification sent.")
           except Exception as e:
-            print(f"::warning::Slack notification failed (release still succeeded): {e}")
+              print(f"::warning::Slack notification failed: {e}")
           PYEOF
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
@@ -1234,7 +1233,7 @@ jobs:
           CLAMAV:        ${{ steps.clamav.outputs.scan_summary }}
           REPO:          ${{ github.repository }}
 
-      # ── 24. Telegram notification ─────────────────────────────────────────────
+       # ── 24. Telegram notification ─────────────────────────────────────────────
       - name: Notify Telegram
         if: ${{ inputs.dry_run != true && env.HAS_TELEGRAM == 'true' && inputs.telegram_chat_id != '' }}
         run: |
@@ -1252,18 +1251,18 @@ jobs:
               f"[View Release]({os.environ.get('RELEASE_URL','')})"
           )
 
-          params = urllib.parse.urlencode({
-              "chat_id":    os.environ["TELEGRAM_CHAT_ID"],
-              "text":       text,
-              "parse_mode": "Markdown"
-          })
           try:
-            urllib.request.urlopen(
-                f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage?{params}"
-            )
-            print("Telegram notification sent.")
+              params = urllib.parse.urlencode({
+                  "chat_id":    os.environ["TELEGRAM_CHAT_ID"],
+                  "text":       text,
+                  "parse_mode": "Markdown"
+              })
+              urllib.request.urlopen(
+                  f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage?{params}"
+              )
+              print("Telegram notification sent.")
           except Exception as e:
-            print(f"::warning::Telegram notification failed (release still succeeded): {e}")
+              print(f"::warning::Telegram notification failed: {e}")
           PYEOF
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
