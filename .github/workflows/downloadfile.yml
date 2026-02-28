@@ -304,6 +304,7 @@ jobs:
             HTTP_CODE=$(curl -o /dev/null -s -w "%{http_code}" \
               --max-time 15 --location \
               -H "Range: bytes=0-0" \
+              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
               "${CURL_AUTH[@]}" \
               "$URL")
 
@@ -356,8 +357,10 @@ jobs:
             else
               HEADERS=$(curl -s -D- -o /dev/null --location --max-time 15 \
                          -H "Range: bytes=0-0" \
+                         -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
                          "${CURL_AUTH[@]}" "$URL" 2>/dev/null \
                        || curl -s -D- -o /dev/null --location --max-time 15 \
+                         -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
                          "${CURL_AUTH[@]}" "$URL" 2>/dev/null)
 
               FILENAME=$(echo "$HEADERS" \
@@ -455,8 +458,23 @@ jobs:
 
               if [ "$FILE_COUNT" -eq 1 ]; then
                 DL_FILE=$(find "/tmp/torrent_dl_${IDX}" -maxdepth 5 -type f | head -1)
-                mv "$DL_FILE" "./$FILENAME"
-                echo "[$IDX] Single-file torrent moved to: $FILENAME"
+                # Fix 1C: Use the filename aria2c actually produced (e.g. ubuntu.iso)
+                # rather than the descriptor URL name (e.g. ubuntu.iso.torrent).
+                # Apply the same sanitization as Step 5 — the torrent payload name
+                # may contain spaces or special chars (e.g. "Ubuntu 22.04.iso") that
+                # would crash `source /tmp/meta_N.env` in Step 7 (bash would try to
+                # execute "22.04.iso" as a command). Sanitize before mv and filenames.txt.
+                ACTUAL_NAME=$(basename "$DL_FILE")
+                SANITIZED_NAME=$(echo "$ACTUAL_NAME" | sed 's/[:<>"\\/|?* ]/_/g' | tr -s '_')
+                if [ "$SANITIZED_NAME" != "$ACTUAL_NAME" ]; then
+                  echo "::warning::[$IDX] Torrent payload filename sanitized: '$ACTUAL_NAME' → '$SANITIZED_NAME'"
+                fi
+                mv "$DL_FILE" "./$SANITIZED_NAME"
+                FILENAME="$SANITIZED_NAME"
+                awk -v line="$IDX" -v val="$SANITIZED_NAME" \
+                  'NR==line{$0=val}1' /tmp/filenames.txt > /tmp/fn_tmp.txt \
+                  && mv /tmp/fn_tmp.txt /tmp/filenames.txt
+                echo "[$IDX] Single-file torrent moved to: $SANITIZED_NAME"
               elif [ "$FILE_COUNT" -gt 1 ]; then
                 ZIP_NAME="${FILENAME%.torrent}.zip"
                 ZIP_NAME="${ZIP_NAME:-torrent_${IDX}.zip}"
@@ -569,16 +587,16 @@ jobs:
             fi
 
             cat > "/tmp/meta_${IDX}.env" <<EOF
-          FILENAME=$FILENAME
-          SIZE_BYTES=$SIZE_BYTES
-          SIZE_HUMAN=$SIZE_HUMAN
-          MD5=$MD5
-          SHA1=$SHA1
-          SHA256=$SHA256
-          SHA512=$SHA512
-          MIME=$MIME
-          SPEED_HUMAN=$SPEED_HUMAN
-          DURATION=$DURATION
+          FILENAME="$FILENAME"
+          SIZE_BYTES="$SIZE_BYTES"
+          SIZE_HUMAN="$SIZE_HUMAN"
+          MD5="$MD5"
+          SHA1="$SHA1"
+          SHA256="$SHA256"
+          SHA512="$SHA512"
+          MIME="$MIME"
+          SPEED_HUMAN="$SPEED_HUMAN"
+          DURATION="$DURATION"
           EOF
 
             printf -- "--- File %d ---\n" "$IDX"
@@ -724,7 +742,7 @@ jobs:
                 if code == 'NotFoundError':
                     print('— Not found (file may be new/unknown)')
                 elif code == 'QuotaExceededError':
-                    print('⚠️ VT quota exceeded')
+                    print('::warning::VirusTotal quota exceeded — results unavailable for this run. Consider upgrading your API plan.')
                 else:
                     print(f'— VT error: {code}')
             else:
@@ -1290,27 +1308,37 @@ jobs:
                   if len(parts) == 3:
                       oversized[parts[0]] = (parts[1], parts[2])
 
+          def html_escape(s):
+              """Escape the five XML/HTML special chars Telegram HTML mode requires."""
+              return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;")
+
           file_lines = []
           for fn in filenames:
               if fn in oversized:
                   size, run_url = oversized[fn]
-                  file_lines.append(f"  • `{fn}` ⚠️ {size} — too large, [download from artifact]({run_url})")
+                  file_lines.append(
+                      f"  • <code>{html_escape(fn)}</code> ⚠️ {html_escape(size)} — "
+                      f"too large, <a href=\"{html_escape(run_url)}\">download from artifact</a>"
+                  )
               else:
-                  file_lines.append(f"  • `{fn}`")
+                  file_lines.append(f"  • <code>{html_escape(fn)}</code>")
           file_list = "\n".join(file_lines)
 
+          # Fix 1A: Use parse_mode=HTML — the legacy Markdown parser breaks on
+          # underscores/asterisks inside filenames (e.g. my_app_v1.0.zip → 400 error).
+          # HTML mode is Telegram's recommended replacement and is safely escaped above.
           text = (
-              f"*📦 New Release: {os.environ['TAG']}*\n"
+              f"<b>📦 New Release: {html_escape(os.environ['TAG'])}</b>\n"
               f"Files:\n{file_list}\n"
-              f"ClamAV: {os.environ.get('CLAMAV','—')}\n"
-              f"[View Release]({os.environ.get('RELEASE_URL','')})"
+              f"ClamAV: {html_escape(os.environ.get('CLAMAV','—'))}\n"
+              f"<a href=\"{html_escape(os.environ.get('RELEASE_URL',''))}\">View Release</a>"
           )
 
           try:
               params = urllib.parse.urlencode({
                   "chat_id":    os.environ["TELEGRAM_CHAT_ID"],
                   "text":       text,
-                  "parse_mode": "Markdown"
+                  "parse_mode": "HTML"
               })
               urllib.request.urlopen(
                   f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage?{params}"
