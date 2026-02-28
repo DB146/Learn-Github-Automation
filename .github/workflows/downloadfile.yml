@@ -907,8 +907,7 @@ jobs:
               # never reached the artifact, making the download link in the release
               # body point to a bundle that did not actually contain the file.
               cp "$source_file" "/tmp/oversized/$FILENAME"
-              printf '%s|%s|%s
-' "$FILENAME" "$SIZE_HUMAN" "$RUN_URL" >> /tmp/oversized_files.txt
+              printf '%s|%s|%s ' "$FILENAME" "$SIZE_HUMAN" "$RUN_URL" >> /tmp/oversized_files.txt
             else
               cp "$source_file" "/tmp/release_staging/$FILENAME"
               echo "Staged: $FILENAME ($SIZE_HUMAN)"
