@@ -479,7 +479,7 @@ jobs:
                 ZIP_NAME="${FILENAME%.torrent}.zip"
                 ZIP_NAME="${ZIP_NAME:-torrent_${IDX}.zip}"
                 echo "::warning::[$IDX] Multi-file torrent ($FILE_COUNT files) — packaging as $ZIP_NAME"
-                (cd "/tmp/torrent_dl_${IDX}" && zip -r - .) > "./$ZIP_NAME"
+                (cd "/tmp/torrent_dl_${IDX}" && zip -r - . -x "*.aria2") > "./$ZIP_NAME"
                 FILENAME="$ZIP_NAME"
                 awk -v line="$IDX" -v val="$FILENAME" 'NR==line{$0=val}1' /tmp/filenames.txt > /tmp/fn_tmp.txt && mv /tmp/fn_tmp.txt /tmp/filenames.txt
                 echo "[$IDX] Multi-file torrent zipped to: $FILENAME"
@@ -872,27 +872,28 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       # ── 15. Stage release files ───────────────────────────────────────────────
-      # FIX: Before staging, check every downloaded file against GitHub's hard
-      # 2 GB per-asset limit (2,147,483,648 bytes). Files that exceed this limit
-      # cannot be attached to a release — doing so causes a fatal API error with
-      # no useful recovery path. Instead of failing the whole job, we:
-      #   1. Skip the oversized file from the staging directory (it is NOT uploaded).
-      #   2. Record its name, size, and the direct workflow run URL in a sidecar
-      #      file (/tmp/oversized_files.txt) so the release body step can include
-      #      a prominent notice with a download link pointing back to this run's
-      #      artifact (which always holds the full file regardless of size).
-      #   3. Emit an Actions warning annotation so the file is flagged in the UI.
+      # Before staging, check every downloaded file against GitHub's hard 2 GiB
+      # per-asset limit (2,147,483,648 bytes). Files that exceed this cannot be
+      # attached to a release. Instead of failing the whole job we:
+      #   1. Copy oversized files to /tmp/oversized/ (a dedicated directory that
+      #      the artifact uploader picks up in Step 16 via a separate path entry).
+      #      This ensures they are genuinely present in the artifact — previously
+      #      they were left in the workspace and silently omitted.
+      #   2. Record name/size/run-URL in /tmp/oversized_files.txt so the release
+      #      body can show a prominent notice with a direct download link.
+      #   3. Emit a ::warning:: annotation visible in the GitHub Actions UI.
       # checksums.txt and metadata.json are always staged — they document every
-      # file including the oversized ones.
+      # file including oversized ones.
       - name: Stage release files
         id: stage
         if: ${{ inputs.dry_run != true }}
         run: |
           mkdir -p /tmp/release_staging
-          GITHUB_MAX_BYTES=2147483648   # GitHub's hard 2 GiB release-asset limit
+          mkdir -p /tmp/oversized          # Fix 1A: dedicated dir for oversized files
+          GITHUB_MAX_BYTES=2147483648      # GitHub's hard 2 GiB release-asset limit
           RUN_URL="${{ steps.meta.outputs.run_url }}"
 
-          > /tmp/oversized_files.txt   # clear/create the sidecar
+          > /tmp/oversized_files.txt       # clear/create the sidecar
 
           while IFS= read -r FILENAME; do
             source_file="./$FILENAME"
@@ -900,8 +901,14 @@ jobs:
             SIZE_HUMAN=$(numfmt --to=iec-i --suffix=B "$SIZE_BYTES")
 
             if (( SIZE_BYTES > GITHUB_MAX_BYTES )); then
-              echo "::warning::$FILENAME is $SIZE_HUMAN — exceeds GitHub's 2 GiB release-asset limit. It will NOT be attached to the release. Download it from the workflow artifact instead: $RUN_URL"
-              printf '%s|%s|%s\n' "$FILENAME" "$SIZE_HUMAN" "$RUN_URL" >> /tmp/oversized_files.txt
+              echo "::warning::$FILENAME is $SIZE_HUMAN — exceeds GitHub'''s 2 GiB release-asset limit. It will NOT be attached to the release but IS included in the workflow artifact: $RUN_URL"
+              # Fix 1A: Copy to /tmp/oversized/ so Step 16 can include it in the
+              # artifact upload. Previously the file was left in the workspace and
+              # never reached the artifact, making the download link in the release
+              # body point to a bundle that did not actually contain the file.
+              cp "$source_file" "/tmp/oversized/$FILENAME"
+              printf '%s|%s|%s
+' "$FILENAME" "$SIZE_HUMAN" "$RUN_URL" >> /tmp/oversized_files.txt
             else
               cp "$source_file" "/tmp/release_staging/$FILENAME"
               echo "Staged: $FILENAME ($SIZE_HUMAN)"
@@ -911,19 +918,28 @@ jobs:
           cp checksums.txt /tmp/release_staging/
           cp metadata.json /tmp/release_staging/
 
-          echo "Staged files:"
+          echo "Staged files (release):"
           ls -lh /tmp/release_staging/
 
+          if [ -s /tmp/oversized_files.txt ]; then
+            echo "Oversized files (artifact only):"
+            ls -lh /tmp/oversized/
+          fi
+
       # ── 16. Upload Actions artifact ───────────────────────────────────────────
-      # The artifact always contains ALL downloaded files (including oversized
-      # ones that were excluded from the release). Users can download oversized
-      # files from here via the link printed in the release body.
+      # Fix 1A: Upload BOTH the staging directory (normal files + checksums +
+      # metadata) AND /tmp/oversized/ (files too large for the release asset API).
+      # Using two explicit paths is cleaner than uploading the whole workspace,
+      # which would capture .torrent descriptors, aria2 state files, and other
+      # temp artefacts we do not want in the bundle.
       - name: Upload artifact bundle
         if: ${{ inputs.dry_run != true }}
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ steps.tag.outputs.tag }}
-          path: /tmp/release_staging/
+          path: |
+            /tmp/release_staging/
+            /tmp/oversized/
           retention-days: ${{ inputs.artifact_retention_days }}
           if-no-files-found: error
 
@@ -1042,14 +1058,32 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ── 19. Delete artifact after release (optional) ──────────────────────────
-      - name: Delete artifact after release
+      # Fix 1B: If oversized files exist, the artifact is the ONLY place users
+      # can download them — the release body links directly to it. Deleting the
+      # artifact in that situation would create permanent broken links.
+      # A preceding bash step writes HAS_OVERSIZED=true to $GITHUB_ENV when
+      # oversized files are detected; the actual deletion action only runs when
+      # that flag is absent. This is necessary because YAML `if:` expressions
+      # cannot read /tmp files directly — only env vars and step outputs.
+      - name: Check oversized files before artifact deletion
+        id: oversized-check
         if: ${{ inputs.dry_run != true && inputs.delete_artifact_after_release == true }}
+        run: |
+          if [ -s /tmp/oversized_files.txt ]; then
+            echo "::warning::Artifact deletion skipped — the artifact contains oversized file(s) linked from the release body. Deleting it would create broken download links."
+            echo "Files preserved in artifact:"
+            cut -d'|' -f1 /tmp/oversized_files.txt
+            echo "HAS_OVERSIZED=true" >> "$GITHUB_ENV"
+          else
+            echo "No oversized files — artifact deletion will proceed."
+          fi
+
+      - name: Delete artifact after release
+        if: ${{ inputs.dry_run != true && inputs.delete_artifact_after_release == true && env.HAS_OVERSIZED != 'true' }}
         uses: geekyeggo/delete-artifact@v5
         with:
           name: release-${{ steps.tag.outputs.tag }}
           failOnError: false
-
-      # ── 20. Write job summary ─────────────────────────────────────────────────
       - name: Write job summary
         if: always()
         run: |
