@@ -228,9 +228,6 @@ jobs:
           echo "Input validation passed."
 
       # ── 2. Map secrets to $GITHUB_ENV flags ──────────────────────────────────
-      # Workaround: `secrets` context is forbidden in both step `if:` expressions
-      # AND job-level `env:` blocks. Writing to $GITHUB_ENV from a `run:` step is
-      # the only supported pattern — secrets ARE accessible inside `run:`.
       - name: Check available secrets
         run: |
           [ -n "${{ secrets.DISCORD_WEBHOOK }}"    ] && echo "HAS_DISCORD=true"  >> "$GITHUB_ENV" || true
@@ -239,18 +236,11 @@ jobs:
           [ -n "${{ secrets.VIRUSTOTAL_API_KEY }}" ] && echo "HAS_VT=true"       >> "$GITHUB_ENV" || true
 
       # ── 3a. Get today's date (ClamAV cache key) ─────────────────────────────
-      # Must run BEFORE the cache step because actions/cache evaluates `key:`
-      # expressions at step-start time.
       - name: Get today's date (for ClamAV cache key)
         id: date
         run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       # ── 3b. Cache ClamAV virus definitions ───────────────────────────────────
-      # Fix: Cache a user-owned proxy directory (~/.clamav_db_cache) instead of
-      # the root-owned /var/lib/clamav. actions/cache runs as the runner user
-      # (UID 1001) and cannot write to system directories — doing so causes
-      # "Permission denied" failures on cache restore.
-      # Key rotates daily so definitions stay fresh.
       - name: Cache ClamAV definitions
         id: clamav-cache
         uses: actions/cache@v4
@@ -261,36 +251,23 @@ jobs:
             clamav-definitions-${{ runner.os }}-
 
       # ── 3c. Install tools ────────────────────────────────────────────────────
-      # Notes:
-      # - apt cache removed: GitHub mirrors are in the same DC; downloading
-      #   packages takes ~2s. Cache upload/download is slower than just installing.
-      # - bc added explicitly (required for float arithmetic throughout).
-      # - clamav-freshclam daemon is stopped before manual freshclam to prevent
-      #   "database locked by another process" errors (apt auto-starts the daemon).
-      # - ClamAV definitions are proxied through ~/.clamav_db_cache (user-owned)
-      #   and copied into /var/lib/clamav with sudo.
       - name: Install tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq aria2 clamav clamav-daemon gnupg bc
 
-          # Fix: Stop the auto-started freshclam daemon before doing anything
-          # with the database — otherwise it holds a lock and our freshclam fails.
           sudo systemctl stop clamav-freshclam || true
 
-          # Restore cached definitions from user-owned proxy dir if present
           if [ -d "$HOME/.clamav_db_cache" ] && [ "$(ls -A "$HOME/.clamav_db_cache")" ]; then
             echo "Restoring ClamAV definitions from cache..."
             sudo cp -r "$HOME"/.clamav_db_cache/* /var/lib/clamav/
             sudo chown -R clamav:clamav /var/lib/clamav
           fi
 
-          # Run freshclam only on cache miss (or if proxy dir was empty)
           if [ "${{ steps.clamav-cache.outputs.cache-hit }}" != "true" ]; then
             echo "ClamAV cache miss — running freshclam..."
             sudo freshclam --quiet || echo "::warning::ClamAV signature update failed — using existing definitions."
 
-            # Save updated definitions to user-owned proxy dir for caching
             mkdir -p "$HOME/.clamav_db_cache"
             sudo cp -r /var/lib/clamav/* "$HOME/.clamav_db_cache/"
             sudo chown -R "$USER":"$USER" "$HOME/.clamav_db_cache"
@@ -300,17 +277,12 @@ jobs:
           fi
 
       # ── 4. Parse and validate URLs ───────────────────────────────────────────
-      # Fix (Gemini 1): Basic Auth passed in pre-flight curl.
-      # Fix (Gemini 4): Use GET with Range: bytes=0-0 instead of HEAD — many
-      #                 hosts return 403/405 for HEAD but serve GET correctly.
-      # Fix (Gemini 2): CURL_AUTH built as a bash array to handle spaces in passwords.
       - name: Parse and validate URLs
         id: urls
         run: |
           RAW="${{ inputs.download_url }}"
           BASIC_AUTH="${{ inputs.basic_auth }}"
 
-          # Fix 2: Use array for auth args — safe when password contains spaces
           CURL_AUTH=()
           [ -n "$BASIC_AUTH" ] && CURL_AUTH=("--user" "$BASIC_AUTH")
 
@@ -318,7 +290,7 @@ jobs:
           COUNT=0
 
           for URL in "${URL_ARRAY[@]}"; do
-            URL=$(echo "$URL" | xargs)  # trim whitespace
+            URL=$(echo "$URL" | xargs)
 
             if [[ ! "$URL" =~ ^https?:// ]]; then
               echo "::error::URL must start with http:// or https://. Got: $URL"
@@ -329,8 +301,6 @@ jobs:
               echo "::warning::URL uses plain HTTP (unencrypted): $URL"
             fi
 
-            # Fix 4: GET + Range header instead of HEAD to avoid 403/405 errors.
-            # Accept 206 (Partial Content) as success for range-capable servers.
             HTTP_CODE=$(curl -o /dev/null -s -w "%{http_code}" \
               --max-time 15 --location \
               -H "Range: bytes=0-0" \
@@ -352,10 +322,6 @@ jobs:
           echo "$COUNT URL(s) validated."
 
       # ── 5. Resolve filenames and detect source types ──────────────────────────
-      # Fix (Gemini 1): Auth passed in all curl calls.
-      # Fix (Gemini 2): Spaces replaced in filename sanitization; written to
-      #                 newline-delimited file, never space-separated string.
-      # Fix (Gemini 4): GET with Range instead of HEAD for header fetching.
       - name: Resolve filenames and detect source types
         id: resolve
         run: |
@@ -363,7 +329,6 @@ jobs:
           BASIC_AUTH="${{ inputs.basic_auth }}"
           URL_COUNT="${{ steps.urls.outputs.url_count }}"
 
-          # Fix 2: Auth array — safe for passwords with spaces
           CURL_AUTH=()
           [ -n "$BASIC_AUTH" ] && CURL_AUTH=("--user" "$BASIC_AUTH")
 
@@ -373,7 +338,6 @@ jobs:
             SOURCE_TYPE="generic"
             GDRIVE_ID=""
 
-            # Detect special sources
             if echo "$URL" | grep -qE "drive\.google\.com/(file/d/|open\?id=)"; then
               SOURCE_TYPE="gdrive"
               GDRIVE_ID=$(echo "$URL" | grep -oP '(?<=/d/)[^/]+|(?<=id=)[^&]+' | head -1)
@@ -386,27 +350,21 @@ jobs:
               echo "[$IDX] .torrent file URL detected."
             fi
 
-            # ── Resolve filename ────────────────────────────────────────────
             if [ -n "$FILE_RENAME" ] && [ "$URL_COUNT" = "1" ]; then
               FILENAME="$FILE_RENAME"
               echo "[$IDX] Using user-provided filename: $FILENAME"
             else
-              # Fix 4: -D- dumps response headers to stdout; -o /dev/null discards
-              # the body. Range header requests only first byte — no HEAD needed.
-              # Falls back to a full GET if the server doesn't support range requests.
               HEADERS=$(curl -s -D- -o /dev/null --location --max-time 15 \
                          -H "Range: bytes=0-0" \
                          "${CURL_AUTH[@]}" "$URL" 2>/dev/null \
                        || curl -s -D- -o /dev/null --location --max-time 15 \
                          "${CURL_AUTH[@]}" "$URL" 2>/dev/null)
 
-              # 1) Standard Content-Disposition: filename="foo.apk"
               FILENAME=$(echo "$HEADERS" \
                 | grep -i 'content-disposition' \
                 | sed -n 's/.*filename[^;=\n]*=\s*["\x27]\?\([^"\x27;\r\n]*\).*/\1/Ip' \
                 | tr -d '\r')
 
-              # 2) RFC 5987: filename*=UTF-8''foo%20bar.apk
               if [ -z "$FILENAME" ]; then
                 FILENAME=$(echo "$HEADERS" \
                   | grep -i 'content-disposition' \
@@ -416,17 +374,13 @@ jobs:
                   | tr -d '\r')
               fi
 
-              # 3) URL path basename (strip query string)
               if [ -z "$FILENAME" ]; then
                 FILENAME=$(basename "$(echo "$URL" | cut -d'?' -f1)")
               fi
 
-              # 4) Last-resort default
               FILENAME="${FILENAME:-downloaded_file_${IDX}}"
             fi
 
-            # ── Sanitize filename ────────────────────────────────────────────
-            # Fix 2: Spaces → underscore, plus all other GitHub-illegal chars
             ORIGINAL="$FILENAME"
             FILENAME=$(echo "$FILENAME" | sed 's/[:<>"\\/|?* ]/_/g' | tr -s '_')
             if [ "$FILENAME" != "$ORIGINAL" ]; then
@@ -435,26 +389,26 @@ jobs:
 
             echo "$SOURCE_TYPE" > "/tmp/source_type_${IDX}.txt"
             echo "$GDRIVE_ID"   > "/tmp/gdrive_id_${IDX}.txt"
-            # Fix 2: One filename per line — never space-delimited
             printf '%s\n' "$FILENAME" >> /tmp/filenames.txt
             echo "[$IDX] Filename: $FILENAME | Source: $SOURCE_TYPE"
 
           done < /tmp/urls.txt
 
       # ── 6. Download all files ────────────────────────────────────────────────
-      # Fix (Gemini 2): All curl/aria2 auth args use bash arrays.
-      # Fix (Gemini 3): Multi-file torrents are zipped; single-file torrents
-      #                 are moved directly. Filename updated accordingly.
       - name: Download files
         id: download
         run: |
           BASIC_AUTH="${{ inputs.basic_auth }}"
           TIMEOUT_MIN="${{ inputs.download_timeout_minutes }}"
-          TIMEOUT_SEC=0
-          [ -n "$TIMEOUT_MIN" ] && [ "$TIMEOUT_MIN" -gt 0 ] 2>/dev/null && \
-            TIMEOUT_SEC=$((TIMEOUT_MIN * 60))
 
-          # Fix 2: Auth arrays — safe for passwords containing spaces
+          # Fix: Initialise TIMEOUT_SEC to 0 first, then only set it when
+          # TIMEOUT_MIN is a positive integer — prevents aria2c receiving
+          # --timeout=0, which it rejects with errorCode=28.
+          TIMEOUT_SEC=0
+          if [ -n "$TIMEOUT_MIN" ] && [ "$TIMEOUT_MIN" -gt 0 ] 2>/dev/null; then
+            TIMEOUT_SEC=$((TIMEOUT_MIN * 60))
+          fi
+
           CURL_AUTH=()
           ARIA_AUTH=()
           if [ -n "$BASIC_AUTH" ]; then
@@ -464,7 +418,6 @@ jobs:
             ARIA_AUTH=("--http-user=${ARIA_USER}" "--http-passwd=${ARIA_PASS}")
           fi
 
-          # Fix 2: Timeout arrays — empty arrays expand to nothing cleanly
           CURL_TIMEOUT=()
           ARIA_TIMEOUT=()
           if [ "$TIMEOUT_SEC" -gt 0 ]; then
@@ -483,13 +436,11 @@ jobs:
             START_NS=$(date +%s%N)
 
             if [ "$SOURCE_TYPE" = "torrent" ]; then
-              # Download the .torrent descriptor first
               echo "Fetching .torrent descriptor..."
               curl -L --fail --retry 3 \
                    "${CURL_TIMEOUT[@]}" "${CURL_AUTH[@]}" \
                    -o "/tmp/file_${IDX}.torrent" "$URL"
 
-              # Fetch torrent content via aria2c (no seeding)
               echo "Fetching torrent content (seed-time=0)..."
               mkdir -p "/tmp/torrent_dl_${IDX}"
               aria2c \
@@ -499,23 +450,19 @@ jobs:
                 "${ARIA_AUTH[@]}" \
                 "/tmp/file_${IDX}.torrent"
 
-              # Fix 3: Count downloaded files
               FILE_COUNT=$(find "/tmp/torrent_dl_${IDX}" -maxdepth 5 -type f | wc -l)
               echo "[$IDX] Torrent downloaded $FILE_COUNT file(s)."
 
               if [ "$FILE_COUNT" -eq 1 ]; then
-                # Single-file torrent: move directly
                 DL_FILE=$(find "/tmp/torrent_dl_${IDX}" -maxdepth 5 -type f | head -1)
                 mv "$DL_FILE" "./$FILENAME"
                 echo "[$IDX] Single-file torrent moved to: $FILENAME"
               elif [ "$FILE_COUNT" -gt 1 ]; then
-                # Fix 3: Multi-file torrent: zip the whole directory
                 ZIP_NAME="${FILENAME%.torrent}.zip"
                 ZIP_NAME="${ZIP_NAME:-torrent_${IDX}.zip}"
                 echo "::warning::[$IDX] Multi-file torrent ($FILE_COUNT files) — packaging as $ZIP_NAME"
                 (cd "/tmp/torrent_dl_${IDX}" && zip -r - .) > "./$ZIP_NAME"
                 FILENAME="$ZIP_NAME"
-                # Update the filenames list so downstream steps use the zip name
                 awk -v line="$IDX" -v val="$FILENAME" 'NR==line{$0=val}1' /tmp/filenames.txt > /tmp/fn_tmp.txt && mv /tmp/fn_tmp.txt /tmp/filenames.txt
                 echo "[$IDX] Multi-file torrent zipped to: $FILENAME"
               else
@@ -548,7 +495,6 @@ jobs:
                    -o "./$FILENAME" "$URL"
 
             else
-              # Generic: aria2c multi-connection + resume, curl fallback + resume
               aria2c \
                 --split=8 \
                 --max-connection-per-server=8 \
@@ -576,7 +522,6 @@ jobs:
             DURATION_SEC=$(echo "scale=2; $((END_NS - START_NS)) / 1000000 / 1000" | bc)
             echo "$DURATION_SEC" > "/tmp/duration_${IDX}.txt"
 
-            # Fix 5: HTML guard — skip if text/html is explicitly in the allowlist
             DETECTED_MIME=$(file --mime-type -b "./$FILENAME")
             ALLOWED_MIMES="${{ inputs.allowed_mimes }}"
             HTML_ALLOWED=false
@@ -652,8 +597,6 @@ jobs:
           echo "run_url=$RUN_URL"     >> "$GITHUB_OUTPUT"
 
       # ── 8. File size and MIME type checks ─────────────────────────────────────
-      # Fix (Gemini 1): bc output truncated to integer with /1 before passing
-      #                 to bash (( )) — prevents crash on float inputs like 1.5.
       - name: Check file size and MIME type
         run: |
           MAX_MB="${{ inputs.max_size_mb }}"
@@ -665,7 +608,6 @@ jobs:
             source "/tmp/meta_${IDX}.env"
 
             if [ -n "$MAX_MB" ] && [ "$MAX_MB" != "0" ]; then
-              # Fix 1: Use /1 in bc to guarantee integer output — (( )) rejects floats
               MAX_BYTES=$(echo "$MAX_MB * 1048576 / 1" | bc)
               if (( SIZE_BYTES > MAX_BYTES )); then
                 echo "::error::[$IDX] $FILENAME: size ($SIZE_HUMAN) exceeds limit of ${MAX_MB} MB."
@@ -750,7 +692,6 @@ jobs:
           echo "ClamAV: $SUMMARY"
 
       # ── 11. VirusTotal hash lookup ────────────────────────────────────────────
-      # Rate-limit: free tier = 4 req/min → sleep 16s between requests.
       - name: VirusTotal hash lookup
         id: vt
         if: ${{ env.HAS_VT == 'true' }}
@@ -913,13 +854,40 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       # ── 15. Stage release files ───────────────────────────────────────────────
+      # FIX: Before staging, check every downloaded file against GitHub's hard
+      # 2 GB per-asset limit (2,147,483,648 bytes). Files that exceed this limit
+      # cannot be attached to a release — doing so causes a fatal API error with
+      # no useful recovery path. Instead of failing the whole job, we:
+      #   1. Skip the oversized file from the staging directory (it is NOT uploaded).
+      #   2. Record its name, size, and the direct workflow run URL in a sidecar
+      #      file (/tmp/oversized_files.txt) so the release body step can include
+      #      a prominent notice with a download link pointing back to this run's
+      #      artifact (which always holds the full file regardless of size).
+      #   3. Emit an Actions warning annotation so the file is flagged in the UI.
+      # checksums.txt and metadata.json are always staged — they document every
+      # file including the oversized ones.
       - name: Stage release files
+        id: stage
         if: ${{ inputs.dry_run != true }}
         run: |
           mkdir -p /tmp/release_staging
+          GITHUB_MAX_BYTES=2147483648   # GitHub's hard 2 GiB release-asset limit
+          RUN_URL="${{ steps.meta.outputs.run_url }}"
+
+          > /tmp/oversized_files.txt   # clear/create the sidecar
 
           while IFS= read -r FILENAME; do
-            cp "./$FILENAME" "/tmp/release_staging/$FILENAME"
+            source_file="./$FILENAME"
+            SIZE_BYTES=$(stat -c%s "$source_file")
+            SIZE_HUMAN=$(numfmt --to=iec-i --suffix=B "$SIZE_BYTES")
+
+            if (( SIZE_BYTES > GITHUB_MAX_BYTES )); then
+              echo "::warning::$FILENAME is $SIZE_HUMAN — exceeds GitHub's 2 GiB release-asset limit. It will NOT be attached to the release. Download it from the workflow artifact instead: $RUN_URL"
+              printf '%s|%s|%s\n' "$FILENAME" "$SIZE_HUMAN" "$RUN_URL" >> /tmp/oversized_files.txt
+            else
+              cp "$source_file" "/tmp/release_staging/$FILENAME"
+              echo "Staged: $FILENAME ($SIZE_HUMAN)"
+            fi
           done < /tmp/filenames.txt
 
           cp checksums.txt /tmp/release_staging/
@@ -929,6 +897,9 @@ jobs:
           ls -lh /tmp/release_staging/
 
       # ── 16. Upload Actions artifact ───────────────────────────────────────────
+      # The artifact always contains ALL downloaded files (including oversized
+      # ones that were excluded from the release). Users can download oversized
+      # files from here via the link printed in the release body.
       - name: Upload artifact bundle
         if: ${{ inputs.dry_run != true }}
         uses: actions/upload-artifact@v4
@@ -939,12 +910,42 @@ jobs:
           if-no-files-found: error
 
       # ── 17. Build release body ────────────────────────────────────────────────
+      # FIX: If any oversized files were recorded in /tmp/oversized_files.txt,
+      # inject a clearly visible "⚠️ Files Excluded from Release" section at the
+      # top of the release body. Each entry shows the filename, its size, and a
+      # direct link to this workflow run where the full artifact can be downloaded.
       - name: Build release body
         id: body
         run: |
           BODY="/tmp/release_body.md"
-          IDX=0
 
+          # ── Oversized-file notice (injected at the very top if needed) ────────
+          if [ -s /tmp/oversized_files.txt ]; then
+            cat >> "$BODY" <<'MDEOF'
+          ## ⚠️ Files Excluded from This Release
+
+          The following file(s) exceed GitHub's **2 GiB per-asset limit** and could
+          not be attached directly to this release. They are available in the
+          **GitHub Actions artifact** for this workflow run — click the link below
+          each entry to go directly to the run page, then download the artifact bundle.
+
+          | Filename | Size | Download |
+          |---|---|---|
+          MDEOF
+
+            while IFS='|' read -r FNAME FSIZE FRUN_URL; do
+              echo "| \`$FNAME\` | $FSIZE | [⬇️ Download from workflow artifact]($FRUN_URL) |" >> "$BODY"
+            done < /tmp/oversized_files.txt
+
+            echo "" >> "$BODY"
+            echo "> The artifact bundle also contains \`checksums.txt\` and \`metadata.json\`." >> "$BODY"
+            echo "" >> "$BODY"
+            echo "---" >> "$BODY"
+            echo "" >> "$BODY"
+          fi
+
+          # ── Per-file sections ─────────────────────────────────────────────────
+          IDX=0
           while IFS= read -r URL; do
             IDX=$((IDX+1))
             source "/tmp/meta_${IDX}.env"
@@ -1043,12 +1044,22 @@ jobs:
             [ "$DRY" = "true" ] && echo "# 🧪 Dry Run Summary" || echo "# ✅ Download & Release Summary"
             echo ""
 
-            # Cache status
             echo "## ⚡ Cache Status"
             echo "| Cache | Result |"
             echo "|---|---|"
             echo "| **ClamAV definitions** | $( [ "$CL_HIT" = "true" ] && echo "✅ Hit (freshclam skipped)" || echo "❌ Miss (freshclam ran)" ) |"
             echo ""
+
+            # Oversized file notice in summary
+            if [ -s /tmp/oversized_files.txt ]; then
+              echo "## ⚠️ Oversized Files (excluded from release)"
+              echo "| Filename | Size | Workflow Run |"
+              echo "|---|---|---|"
+              while IFS='|' read -r FNAME FSIZE FRUN_URL; do
+                echo "| \`$FNAME\` | $FSIZE | [Download artifact]($FRUN_URL) |"
+              done < /tmp/oversized_files.txt
+              echo ""
+            fi
 
             IDX=0
             while IFS= read -r URL; do
@@ -1100,7 +1111,6 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # Structured table in raw log
           echo ""
           echo "════════════════════════════════════════════════════════"
           echo "  FINAL SUMMARY"
@@ -1153,11 +1163,25 @@ jobs:
           import json, os, urllib.request
 
           with open('/tmp/filenames.txt') as f:
-              filenames =[l.strip() for l in f if l.strip()]
+              filenames = [l.strip() for l in f if l.strip()]
 
-          fields =[{"name": f"File {i+1}", "value": f"`{fn}`", "inline": True}
-                    for i, fn in enumerate(filenames)]
-          fields +=[
+          # Note oversized files in the Discord embed
+          oversized = {}
+          if os.path.exists('/tmp/oversized_files.txt'):
+              for line in open('/tmp/oversized_files.txt').read().strip().splitlines():
+                  parts = line.split('|')
+                  if len(parts) == 3:
+                      oversized[parts[0]] = parts[1]
+
+          fields = []
+          for i, fn in enumerate(filenames):
+              label = f"File {i+1}"
+              value = f"`{fn}`"
+              if fn in oversized:
+                  value += f"\n⚠️ {oversized[fn]} — too large for release, see artifact"
+              fields.append({"name": label, "value": value, "inline": True})
+
+          fields += [
               {"name": "Release", "value": os.environ.get("RELEASE_URL", "—"), "inline": False},
               {"name": "ClamAV",  "value": os.environ.get("CLAMAV", "—"),      "inline": True},
           ]
@@ -1187,6 +1211,7 @@ jobs:
           RELEASE_URL:     ${{ steps.release.outputs.url }}
           CLAMAV:          ${{ steps.clamav.outputs.scan_summary }}
           REPO:            ${{ github.repository }}
+
       # ── 23. Slack notification ────────────────────────────────────────────────
       - name: Notify Slack
         if: ${{ inputs.dry_run != true && env.HAS_SLACK == 'true' }}
@@ -1195,20 +1220,35 @@ jobs:
           import json, os, urllib.request
 
           with open('/tmp/filenames.txt') as f:
-              filenames =[l.strip() for l in f if l.strip()]
-          file_list = "\n".join(f"• `{fn}`" for fn in filenames)
+              filenames = [l.strip() for l in f if l.strip()]
 
-          payload = {"blocks":[
+          oversized = {}
+          if os.path.exists('/tmp/oversized_files.txt'):
+              for line in open('/tmp/oversized_files.txt').read().strip().splitlines():
+                  parts = line.split('|')
+                  if len(parts) == 3:
+                      oversized[parts[0]] = (parts[1], parts[2])
+
+          file_lines = []
+          for fn in filenames:
+              if fn in oversized:
+                  size, run_url = oversized[fn]
+                  file_lines.append(f"• `{fn}` ⚠️ {size} — <{run_url}|download from artifact>")
+              else:
+                  file_lines.append(f"• `{fn}`")
+          file_list = "\n".join(file_lines)
+
+          payload = {"blocks": [
               {"type": "header",
                "text": {"type": "plain_text",
                         "text": f"📦 New Release: {os.environ['TAG']}"}},
               {"type": "section",
-               "fields":[
+               "fields": [
                    {"type": "mrkdwn", "text": f"*Files:*\n{file_list}"},
                    {"type": "mrkdwn", "text": f"*ClamAV:*\n{os.environ.get('CLAMAV','—')}"},
                    {"type": "mrkdwn", "text": f"*Repo:*\n{os.environ.get('REPO')}"},
                ]},
-              {"type": "actions", "elements":[{
+              {"type": "actions", "elements": [{
                   "type": "button",
                   "text": {"type": "plain_text", "text": "View Release"},
                   "url":  os.environ.get("RELEASE_URL", "")
@@ -1233,7 +1273,7 @@ jobs:
           CLAMAV:        ${{ steps.clamav.outputs.scan_summary }}
           REPO:          ${{ github.repository }}
 
-       # ── 24. Telegram notification ─────────────────────────────────────────────
+      # ── 24. Telegram notification ─────────────────────────────────────────────
       - name: Notify Telegram
         if: ${{ inputs.dry_run != true && env.HAS_TELEGRAM == 'true' && inputs.telegram_chat_id != '' }}
         run: |
@@ -1242,11 +1282,26 @@ jobs:
 
           with open('/tmp/filenames.txt') as f:
               filenames = [l.strip() for l in f if l.strip()]
-          file_lines = "\n".join(f"  • `{fn}`" for fn in filenames)
+
+          oversized = {}
+          if os.path.exists('/tmp/oversized_files.txt'):
+              for line in open('/tmp/oversized_files.txt').read().strip().splitlines():
+                  parts = line.split('|')
+                  if len(parts) == 3:
+                      oversized[parts[0]] = (parts[1], parts[2])
+
+          file_lines = []
+          for fn in filenames:
+              if fn in oversized:
+                  size, run_url = oversized[fn]
+                  file_lines.append(f"  • `{fn}` ⚠️ {size} — too large, [download from artifact]({run_url})")
+              else:
+                  file_lines.append(f"  • `{fn}`")
+          file_list = "\n".join(file_lines)
 
           text = (
               f"*📦 New Release: {os.environ['TAG']}*\n"
-              f"Files:\n{file_lines}\n"
+              f"Files:\n{file_list}\n"
               f"ClamAV: {os.environ.get('CLAMAV','—')}\n"
               f"[View Release]({os.environ.get('RELEASE_URL','')})"
           )
