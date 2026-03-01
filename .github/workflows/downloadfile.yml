@@ -63,11 +63,11 @@ on:
         description: "Override saved filename — only applies when a single URL is given"
         required: false
         type: string
-      download_timeout_minutes:
-        description: "Max minutes before download is aborted (0 = no limit)"
+      download_timeout_seconds:
+        description: "Max seconds before download is aborted (0 = no limit)"
         required: false
         type: number
-        default: 60
+        default: 3600
       basic_auth:
         description: "HTTP Basic Auth credentials as username:password (optional)"
         required: false
@@ -134,10 +134,10 @@ on:
       file_rename:
         required: false
         type: string
-      download_timeout_minutes:
+      download_timeout_seconds:
         required: false
         type: number
-        default: 60
+        default: 3600
       basic_auth:
         required: false
         type: string
@@ -201,9 +201,9 @@ jobs:
             ERRORS=$((ERRORS+1))
           fi
 
-          TIMEOUT="${{ inputs.download_timeout_minutes }}"
+          TIMEOUT="${{ inputs.download_timeout_seconds }}"
           if [ -n "$TIMEOUT" ] && ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]]; then
-            echo "::error::download_timeout_minutes must be a non-negative integer. Got: $TIMEOUT"
+            echo "::error::download_timeout_seconds must be a non-negative integer. Got: $TIMEOUT"
             ERRORS=$((ERRORS+1))
           fi
 
@@ -421,14 +421,14 @@ jobs:
         id: download
         run: |
           BASIC_AUTH="${{ inputs.basic_auth }}"
-          TIMEOUT_MIN="${{ inputs.download_timeout_minutes }}"
+          TIMEOUT_SEC_INPUT="${{ inputs.download_timeout_seconds }}"
 
-          # Fix: Initialise TIMEOUT_SEC to 0 first, then only set it when
-          # TIMEOUT_MIN is a positive integer — prevents aria2c receiving
-          # --timeout=0, which it rejects with errorCode=28.
+          # Initialise TIMEOUT_SEC to 0 first, then only set it when the input
+          # is a positive integer — prevents aria2c/curl receiving --timeout=0
+          # or --max-time=0, which aria2c rejects with errorCode=28.
           TIMEOUT_SEC=0
-          if [ -n "$TIMEOUT_MIN" ] && [ "$TIMEOUT_MIN" -gt 0 ] 2>/dev/null; then
-            TIMEOUT_SEC=$((TIMEOUT_MIN * 60))
+          if [ -n "$TIMEOUT_SEC_INPUT" ] && [ "$TIMEOUT_SEC_INPUT" -gt 0 ] 2>/dev/null; then
+            TIMEOUT_SEC="$TIMEOUT_SEC_INPUT"
           fi
 
           CURL_AUTH=()
@@ -444,7 +444,11 @@ jobs:
           ARIA_TIMEOUT=()
           if [ "$TIMEOUT_SEC" -gt 0 ]; then
             CURL_TIMEOUT=("--max-time" "${TIMEOUT_SEC}")
-            ARIA_TIMEOUT=("--timeout=${TIMEOUT_SEC}")
+            # aria2c --timeout is capped at 600s (its hard maximum — values above
+            # 600 crash with errorCode=28). curl --max-time has no such ceiling
+            # so it uses the full requested duration.
+            ARIA_SEC=$(( TIMEOUT_SEC > 600 ? 600 : TIMEOUT_SEC ))
+            ARIA_TIMEOUT=("--timeout=${ARIA_SEC}")
           fi
 
           IDX=0
@@ -821,6 +825,7 @@ jobs:
               for line in open(f'/tmp/meta_{idx}.env').read().strip().splitlines():
                   if '=' in line:
                       k, v = line.split('=', 1)
+                      v = v.strip().strip('"').strip("'")  # handle quoted values e.g. FILENAME="foo.apk"
                       env[k] = v
 
               vt_path = f'/tmp/vt_{idx}.txt'
