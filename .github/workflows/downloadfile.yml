@@ -292,6 +292,15 @@ jobs:
           for URL in "${URL_ARRAY[@]}"; do
             URL=$(echo "$URL" | xargs)
 
+            # Fix D: Rewrite Google Drive /view URLs to the direct usercontent
+            # download endpoint before pre-flight. Without this, Step 4 validates
+            # the Drive viewer HTML page (always 200) rather than the actual file.
+            if echo "$URL" | grep -qE "drive\.google\.com/(file/d/|open\?id=)"; then
+              _GDRIVE_ID=$(echo "$URL" | grep -oP '(?<=/d/)[^/]+|(?<=id=)[^&]+' | head -1)
+              URL="https://drive.usercontent.google.com/download?id=${_GDRIVE_ID}&export=download&authuser=0&confirm=t"
+              echo "Pre-flight: Google Drive URL rewritten for ID: ${_GDRIVE_ID}"
+            fi
+
             if [[ ! "$URL" =~ ^https?:// ]]; then
               echo "::error::URL must start with http:// or https://. Got: $URL"
               exit 1
@@ -342,7 +351,17 @@ jobs:
             if echo "$URL" | grep -qE "drive\.google\.com/(file/d/|open\?id=)"; then
               SOURCE_TYPE="gdrive"
               GDRIVE_ID=$(echo "$URL" | grep -oP '(?<=/d/)[^/]+|(?<=id=)[^&]+' | head -1)
-              echo "[$IDX] Google Drive. ID: $GDRIVE_ID"
+              # Rewrite to the stable direct-download endpoint.
+              # drive.usercontent.google.com is Google's current reliable endpoint;
+              # the old uc?export=download confirm-token scraping breaks whenever
+              # Google changes their warning-page HTML.
+              URL="https://drive.usercontent.google.com/download?id=${GDRIVE_ID}&export=download&authuser=0&confirm=t"
+              # Update urls.txt so downstream steps (metadata, checksums, release
+              # body) show the rewritten URL rather than the original /view link.
+              awk -v line="$IDX" -v val="$URL" \
+                'NR==line{$0=val}1' /tmp/urls.txt > /tmp/urls_tmp.txt \
+                && mv /tmp/urls_tmp.txt /tmp/urls.txt
+              echo "[$IDX] Google Drive. ID: $GDRIVE_ID → rewritten to usercontent endpoint"
             elif echo "$URL" | grep -qE "sourceforge\.net"; then
               SOURCE_TYPE="sourceforge"
               echo "[$IDX] SourceForge detected."
@@ -432,7 +451,6 @@ jobs:
           while IFS= read -r URL; do
             IDX=$((IDX+1))
             SOURCE_TYPE=$(cat "/tmp/source_type_${IDX}.txt")
-            GDRIVE_ID=$(cat "/tmp/gdrive_id_${IDX}.txt")
             FILENAME=$(sed -n "${IDX}p" /tmp/filenames.txt)
 
             echo "=== [$IDX] Downloading: $FILENAME ==="
@@ -489,20 +507,13 @@ jobs:
               fi
 
             elif [ "$SOURCE_TYPE" = "gdrive" ]; then
-              CONFIRM=$(curl -sc /tmp/gdrive_cookies.txt \
-                "${CURL_TIMEOUT[@]}" \
-                "https://drive.google.com/uc?export=download&id=${GDRIVE_ID}" \
-                | grep -o 'confirm=[^&"]*' | head -1 | cut -d= -f2)
-              if [ -n "$CONFIRM" ]; then
-                curl -Lb /tmp/gdrive_cookies.txt \
-                     "${CURL_TIMEOUT[@]}" \
-                  "https://drive.google.com/uc?export=download&confirm=${CONFIRM}&id=${GDRIVE_ID}" \
-                  -o "./$FILENAME"
-              else
-                curl -L "${CURL_TIMEOUT[@]}" \
-                  "https://drive.google.com/uc?export=download&id=${GDRIVE_ID}" \
-                  -o "./$FILENAME"
-              fi
+              # The URL was already rewritten to the usercontent endpoint in Step 5.
+              # No cookie scraping or confirm-token logic needed — a single curl
+              # with --location handles the download directly.
+              curl -L --fail --retry 3 --retry-delay 5 \
+                   -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+                   "${CURL_TIMEOUT[@]}" \
+                   -o "./$FILENAME" "$URL"
 
             elif [ "$SOURCE_TYPE" = "sourceforge" ]; then
               curl -L --fail --retry 5 --retry-delay 10 \
@@ -907,7 +918,7 @@ jobs:
               # never reached the artifact, making the download link in the release
               # body point to a bundle that did not actually contain the file.
               cp "$source_file" "/tmp/oversized/$FILENAME"
-              printf '%s|%s|%s ' "$FILENAME" "$SIZE_HUMAN" "$RUN_URL" >> /tmp/oversized_files.txt
+              printf '%s|%s|%s\n' "$FILENAME" "$SIZE_HUMAN" "$RUN_URL" >> /tmp/oversized_files.txt
             else
               cp "$source_file" "/tmp/release_staging/$FILENAME"
               echo "Staged: $FILENAME ($SIZE_HUMAN)"
@@ -1083,6 +1094,8 @@ jobs:
         with:
           name: release-${{ steps.tag.outputs.tag }}
           failOnError: false
+      # ── 20. Write job summary ─────────────────────────────────────────────────
+
       - name: Write job summary
         if: always()
         run: |
