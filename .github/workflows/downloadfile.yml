@@ -67,7 +67,7 @@ on:
         description: "Max seconds before download is aborted (0 = no limit)"
         required: false
         type: number
-        default: 3600
+        default: 600
       basic_auth:
         description: "HTTP Basic Auth credentials as username:password (optional)"
         required: false
