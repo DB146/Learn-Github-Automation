@@ -190,7 +190,7 @@ jobs:
           ERRORS=0
 
           RETENTION="${{ inputs.artifact_retention_days }}"
-          if [ -n "$RETENTION" ] && { [ "$RETENTION" -lt 1 ] 2>/dev/null || [ "$RETENTION" -gt 90 ] 2>/dev/null; }; then
+          if[ -n "$RETENTION" ] && { [ "$RETENTION" -lt 1 ] 2>/dev/null ||[ "$RETENTION" -gt 90 ] 2>/dev/null; }; then
             echo "::error::artifact_retention_days must be 1–90. Got: $RETENTION"
             ERRORS=$((ERRORS+1))
           fi
@@ -209,13 +209,13 @@ jobs:
 
           TG_CHAT="${{ inputs.telegram_chat_id }}"
           TG_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
-          if [ -n "$TG_CHAT" ] && [ -z "$TG_TOKEN" ]; then
+          if[ -n "$TG_CHAT" ] && [ -z "$TG_TOKEN" ]; then
             echo "::error::TELEGRAM_BOT_TOKEN secret is required when telegram_chat_id is set."
             ERRORS=$((ERRORS+1))
           fi
 
           BASIC_AUTH="${{ inputs.basic_auth }}"
-          if [ -n "$BASIC_AUTH" ] && ! echo "$BASIC_AUTH" | grep -q ':'; then
+          if[ -n "$BASIC_AUTH" ] && ! echo "$BASIC_AUTH" | grep -q ':'; then
             echo "::error::basic_auth must be in username:password format."
             ERRORS=$((ERRORS+1))
           fi
@@ -234,7 +234,7 @@ jobs:
           [ -n "${{ secrets.SLACK_WEBHOOK }}"      ] && echo "HAS_SLACK=true"    >> "$GITHUB_ENV" || true
           [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && echo "HAS_TELEGRAM=true" >> "$GITHUB_ENV" || true
           [ -n "${{ secrets.VIRUSTOTAL_API_KEY }}" ] && echo "HAS_VT=true"       >> "$GITHUB_ENV" || true
-
+  
       # ── 3a. Get today's date (ClamAV cache key) ─────────────────────────────
       - name: Get today's date (for ClamAV cache key)
         id: date
@@ -258,7 +258,7 @@ jobs:
 
           sudo systemctl stop clamav-freshclam || true
 
-          if [ -d "$HOME/.clamav_db_cache" ] && [ "$(ls -A "$HOME/.clamav_db_cache")" ]; then
+          if [ -d "$HOME/.clamav_db_cache" ] &&[ "$(ls -A "$HOME/.clamav_db_cache")" ]; then
             echo "Restoring ClamAV definitions from cache..."
             sudo cp -r "$HOME"/.clamav_db_cache/* /var/lib/clamav/
             sudo chown -R clamav:clamav /var/lib/clamav
@@ -293,12 +293,23 @@ jobs:
             URL=$(echo "$URL" | xargs)
 
             # Fix D: Rewrite Google Drive /view URLs to the direct usercontent
-            # download endpoint before pre-flight. Without this, Step 4 validates
-            # the Drive viewer HTML page (always 200) rather than the actual file.
             if echo "$URL" | grep -qE "drive\.google\.com/(file/d/|open\?id=)"; then
               _GDRIVE_ID=$(echo "$URL" | grep -oP '(?<=/d/)[^/]+|(?<=id=)[^&]+' | head -1)
               URL="https://drive.usercontent.google.com/download?id=${_GDRIVE_ID}&export=download&authuser=0&confirm=t"
               echo "Pre-flight: Google Drive URL rewritten for ID: ${_GDRIVE_ID}"
+            fi
+
+            # NEW: Rewrite MediaFire URLs to the direct download endpoint
+            if echo "$URL" | grep -qE "mediafire\.com/file/"; then
+              echo "Pre-flight: MediaFire link detected. Extracting direct download URL..."
+              DIRECT_URL=$(curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "$URL" | grep -oP 'href="\Khttps?://download[^"]+\.mediafire\.com/[^"]+' | head -1)
+              
+              if[ -z "$DIRECT_URL" ]; then
+                echo "::error::Failed to extract MediaFire direct link for: $URL. File may be deleted, password-protected, or blocked."
+                exit 1
+              fi
+              URL="$DIRECT_URL"
+              echo "Pre-flight: MediaFire URL rewritten to direct link."
             fi
 
             if [[ ! "$URL" =~ ^https?:// ]]; then
@@ -318,7 +329,7 @@ jobs:
               "$URL")
 
             if [ "$HTTP_CODE" -lt 200 ] || \
-               { [ "$HTTP_CODE" -ge 400 ] && [ "$HTTP_CODE" != "206" ]; }; then
+               { [ "$HTTP_CODE" -ge 400 ] &&[ "$HTTP_CODE" != "206" ]; }; then
               echo "::error::Pre-flight check failed (HTTP $HTTP_CODE) for: $URL"
               exit 1
             fi
@@ -351,13 +362,7 @@ jobs:
             if echo "$URL" | grep -qE "drive\.google\.com/(file/d/|open\?id=)"; then
               SOURCE_TYPE="gdrive"
               GDRIVE_ID=$(echo "$URL" | grep -oP '(?<=/d/)[^/]+|(?<=id=)[^&]+' | head -1)
-              # Rewrite to the stable direct-download endpoint.
-              # drive.usercontent.google.com is Google's current reliable endpoint;
-              # the old uc?export=download confirm-token scraping breaks whenever
-              # Google changes their warning-page HTML.
               URL="https://drive.usercontent.google.com/download?id=${GDRIVE_ID}&export=download&authuser=0&confirm=t"
-              # Update urls.txt so downstream steps (metadata, checksums, release
-              # body) show the rewritten URL rather than the original /view link.
               awk -v line="$IDX" -v val="$URL" \
                 'NR==line{$0=val}1' /tmp/urls.txt > /tmp/urls_tmp.txt \
                 && mv /tmp/urls_tmp.txt /tmp/urls.txt
@@ -365,6 +370,10 @@ jobs:
             elif echo "$URL" | grep -qE "sourceforge\.net"; then
               SOURCE_TYPE="sourceforge"
               echo "[$IDX] SourceForge detected."
+            elif echo "$URL" | grep -qE "mediafire\.com"; then
+              # NEW: Detect MediaFire from the rewritten direct link
+              SOURCE_TYPE="mediafire"
+              echo "[$IDX] MediaFire detected."
             elif echo "$URL" | grep -qiE "\.torrent(\?.*)?$"; then
               SOURCE_TYPE="torrent"
               echo "[$IDX] .torrent file URL detected."
@@ -423,11 +432,8 @@ jobs:
           BASIC_AUTH="${{ inputs.basic_auth }}"
           TIMEOUT_SEC_INPUT="${{ inputs.download_timeout_seconds }}"
 
-          # Initialise TIMEOUT_SEC to 0 first, then only set it when the input
-          # is a positive integer — prevents aria2c/curl receiving --timeout=0
-          # or --max-time=0, which aria2c rejects with errorCode=28.
           TIMEOUT_SEC=0
-          if [ -n "$TIMEOUT_SEC_INPUT" ] && [ "$TIMEOUT_SEC_INPUT" -gt 0 ] 2>/dev/null; then
+          if[ -n "$TIMEOUT_SEC_INPUT" ] && [ "$TIMEOUT_SEC_INPUT" -gt 0 ] 2>/dev/null; then
             TIMEOUT_SEC="$TIMEOUT_SEC_INPUT"
           fi
 
@@ -444,9 +450,6 @@ jobs:
           ARIA_TIMEOUT=()
           if [ "$TIMEOUT_SEC" -gt 0 ]; then
             CURL_TIMEOUT=("--max-time" "${TIMEOUT_SEC}")
-            # aria2c --timeout is capped at 600s (its hard maximum — values above
-            # 600 crash with errorCode=28). curl --max-time has no such ceiling
-            # so it uses the full requested duration.
             ARIA_SEC=$(( TIMEOUT_SEC > 600 ? 600 : TIMEOUT_SEC ))
             ARIA_TIMEOUT=("--timeout=${ARIA_SEC}")
           fi
@@ -457,7 +460,7 @@ jobs:
             SOURCE_TYPE=$(cat "/tmp/source_type_${IDX}.txt")
             FILENAME=$(sed -n "${IDX}p" /tmp/filenames.txt)
 
-            echo "=== [$IDX] Downloading: $FILENAME ==="
+            echo "===[$IDX] Downloading: $FILENAME ==="
             START_NS=$(date +%s%N)
 
             if [ "$SOURCE_TYPE" = "torrent" ]; then
@@ -480,12 +483,6 @@ jobs:
 
               if [ "$FILE_COUNT" -eq 1 ]; then
                 DL_FILE=$(find "/tmp/torrent_dl_${IDX}" -maxdepth 5 -type f | head -1)
-                # Fix 1C: Use the filename aria2c actually produced (e.g. ubuntu.iso)
-                # rather than the descriptor URL name (e.g. ubuntu.iso.torrent).
-                # Apply the same sanitization as Step 5 — the torrent payload name
-                # may contain spaces or special chars (e.g. "Ubuntu 22.04.iso") that
-                # would crash `source /tmp/meta_N.env` in Step 7 (bash would try to
-                # execute "22.04.iso" as a command). Sanitize before mv and filenames.txt.
                 ACTUAL_NAME=$(basename "$DL_FILE")
                 SANITIZED_NAME=$(echo "$ACTUAL_NAME" | sed 's/[:<>"\\/|?* ]/_/g' | tr -s '_')
                 if [ "$SANITIZED_NAME" != "$ACTUAL_NAME" ]; then
@@ -510,10 +507,7 @@ jobs:
                 exit 1
               fi
 
-            elif [ "$SOURCE_TYPE" = "gdrive" ]; then
-              # The URL was already rewritten to the usercontent endpoint in Step 5.
-              # No cookie scraping or confirm-token logic needed — a single curl
-              # with --location handles the download directly.
+            elif[ "$SOURCE_TYPE" = "gdrive" ]; then
               curl -L --fail --retry 3 --retry-delay 5 \
                    -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
                    "${CURL_TIMEOUT[@]}" \
@@ -526,6 +520,30 @@ jobs:
                    -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
                    "${CURL_TIMEOUT[@]}" "${CURL_AUTH[@]}" \
                    -o "./$FILENAME" "$URL"
+
+            elif [ "$SOURCE_TYPE" = "mediafire" ]; then
+              # NEW: MediaFire download block
+              # Uses aria2c but limits connections to 4 to prevent 503 Rate Limit errors from MediaFire
+              aria2c \
+                --split=4 \
+                --max-connection-per-server=4 \
+                --min-split-size=5M \
+                --max-tries=5 \
+                --retry-wait=5 \
+                --allow-overwrite=true \
+                --auto-file-renaming=false \
+                --continue=true \
+                -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+                "${ARIA_TIMEOUT[@]}" "${ARIA_AUTH[@]}" \
+                --out="$FILENAME" "$URL" \
+              || {
+                echo "::warning::aria2c failed for MediaFire — falling back to curl."
+                curl -L --fail --retry 3 --retry-delay 5 \
+                     --continue-at - \
+                     -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+                     "${CURL_TIMEOUT[@]}" "${CURL_AUTH[@]}" \
+                     -o "./$FILENAME" "$URL"
+              }
 
             else
               aria2c \
@@ -559,11 +577,10 @@ jobs:
             ALLOWED_MIMES="${{ inputs.allowed_mimes }}"
             HTML_ALLOWED=false
             IFS=',' read -ra MLIST <<< "$ALLOWED_MIMES"
-            for M in "${MLIST[@]}"; do
-              [ "$(echo "$M" | tr -d ' ')" = "text/html" ] && HTML_ALLOWED=true && break
+            for M in "${MLIST[@]}"; do[ "$(echo "$M" | tr -d ' ')" = "text/html" ] && HTML_ALLOWED=true && break
             done
 
-            if [[ "$DETECTED_MIME" == "text/html" ]] && [ "$HTML_ALLOWED" = "false" ]; then
+            if [[ "$DETECTED_MIME" == "text/html" ]] &&[ "$HTML_ALLOWED" = "false" ]; then
               echo "::error::[$IDX] Downloaded file is an HTML page. URL may need auth, use a landing page, or has expired."
               echo "--- First 500 bytes ---"
               head -c 500 "./$FILENAME"
@@ -640,7 +657,7 @@ jobs:
             IDX=$((IDX+1))
             source "/tmp/meta_${IDX}.env"
 
-            if [ -n "$MAX_MB" ] && [ "$MAX_MB" != "0" ]; then
+            if [ -n "$MAX_MB" ] &&[ "$MAX_MB" != "0" ]; then
               MAX_BYTES=$(echo "$MAX_MB * 1048576 / 1" | bc)
               if (( SIZE_BYTES > MAX_BYTES )); then
                 echo "::error::[$IDX] $FILENAME: size ($SIZE_HUMAN) exceeds limit of ${MAX_MB} MB."
@@ -649,13 +666,12 @@ jobs:
               echo "[$IDX] Size OK: $SIZE_HUMAN ≤ ${MAX_MB} MB"
             fi
 
-            if [ -n "$ALLOWED" ]; then
+            if[ -n "$ALLOWED" ]; then
               MATCH=false
               IFS=',' read -ra MLIST <<< "$ALLOWED"
-              for M in "${MLIST[@]}"; do
-                [ "$(echo "$M" | tr -d ' ')" = "$MIME" ] && MATCH=true && break
+              for M in "${MLIST[@]}"; do[ "$(echo "$M" | tr -d ' ')" = "$MIME" ] && MATCH=true && break
               done
-              if [ "$MATCH" = "false" ]; then
+              if[ "$MATCH" = "false" ]; then
                 echo "::error::[$IDX] $FILENAME: MIME '$MIME' not in allowlist: $ALLOWED"
                 exit 1
               fi
@@ -671,7 +687,7 @@ jobs:
           [ -z "$EXP" ] && echo "No expected hash — skipping." && exit 0
 
           URL_COUNT=$(wc -l < /tmp/urls.txt)
-          if [ "$URL_COUNT" -gt 1 ]; then
+          if[ "$URL_COUNT" -gt 1 ]; then
             echo "::error::expected_sha256 can only be used with a single URL. Got $URL_COUNT URLs."
             exit 1
           fi
@@ -818,7 +834,7 @@ jobs:
 
           urls   = open('/tmp/urls.txt').read().strip().splitlines()
           fnames = open('/tmp/filenames.txt').read().strip().splitlines()
-          files  = []
+          files  =[]
 
           for idx, (url, fname) in enumerate(zip(urls, fnames), 1):
               env = {}
@@ -888,28 +904,16 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       # ── 15. Stage release files ───────────────────────────────────────────────
-      # Before staging, check every downloaded file against GitHub's hard 2 GiB
-      # per-asset limit (2,147,483,648 bytes). Files that exceed this cannot be
-      # attached to a release. Instead of failing the whole job we:
-      #   1. Copy oversized files to /tmp/oversized/ (a dedicated directory that
-      #      the artifact uploader picks up in Step 16 via a separate path entry).
-      #      This ensures they are genuinely present in the artifact — previously
-      #      they were left in the workspace and silently omitted.
-      #   2. Record name/size/run-URL in /tmp/oversized_files.txt so the release
-      #      body can show a prominent notice with a direct download link.
-      #   3. Emit a ::warning:: annotation visible in the GitHub Actions UI.
-      # checksums.txt and metadata.json are always staged — they document every
-      # file including oversized ones.
       - name: Stage release files
         id: stage
         if: ${{ inputs.dry_run != true }}
         run: |
           mkdir -p /tmp/release_staging
-          mkdir -p /tmp/oversized          # Fix 1A: dedicated dir for oversized files
-          GITHUB_MAX_BYTES=2147483648      # GitHub's hard 2 GiB release-asset limit
+          mkdir -p /tmp/oversized
+          GITHUB_MAX_BYTES=2147483648
           RUN_URL="${{ steps.meta.outputs.run_url }}"
 
-          > /tmp/oversized_files.txt       # clear/create the sidecar
+          > /tmp/oversized_files.txt
 
           while IFS= read -r FILENAME; do
             source_file="./$FILENAME"
@@ -918,10 +922,6 @@ jobs:
 
             if (( SIZE_BYTES > GITHUB_MAX_BYTES )); then
               echo "::warning::$FILENAME is $SIZE_HUMAN — exceeds GitHub'''s 2 GiB release-asset limit. It will NOT be attached to the release but IS included in the workflow artifact: $RUN_URL"
-              # Fix 1A: Copy to /tmp/oversized/ so Step 16 can include it in the
-              # artifact upload. Previously the file was left in the workspace and
-              # never reached the artifact, making the download link in the release
-              # body point to a bundle that did not actually contain the file.
               cp "$source_file" "/tmp/oversized/$FILENAME"
               printf '%s|%s|%s\n' "$FILENAME" "$SIZE_HUMAN" "$RUN_URL" >> /tmp/oversized_files.txt
             else
@@ -942,11 +942,6 @@ jobs:
           fi
 
       # ── 16. Upload Actions artifact ───────────────────────────────────────────
-      # Fix 1A: Upload BOTH the staging directory (normal files + checksums +
-      # metadata) AND /tmp/oversized/ (files too large for the release asset API).
-      # Using two explicit paths is cleaner than uploading the whole workspace,
-      # which would capture .torrent descriptors, aria2 state files, and other
-      # temp artefacts we do not want in the bundle.
       - name: Upload artifact bundle
         if: ${{ inputs.dry_run != true }}
         uses: actions/upload-artifact@v4
@@ -959,17 +954,13 @@ jobs:
           if-no-files-found: error
 
       # ── 17. Build release body ────────────────────────────────────────────────
-      # FIX: If any oversized files were recorded in /tmp/oversized_files.txt,
-      # inject a clearly visible "⚠️ Files Excluded from Release" section at the
-      # top of the release body. Each entry shows the filename, its size, and a
-      # direct link to this workflow run where the full artifact can be downloaded.
       - name: Build release body
         id: body
         run: |
           BODY="/tmp/release_body.md"
 
           # ── Oversized-file notice (injected at the very top if needed) ────────
-          if [ -s /tmp/oversized_files.txt ]; then
+          if[ -s /tmp/oversized_files.txt ]; then
             cat >> "$BODY" <<'MDEOF'
           ## ⚠️ Files Excluded from This Release
 
@@ -983,7 +974,7 @@ jobs:
           MDEOF
 
             while IFS='|' read -r FNAME FSIZE FRUN_URL; do
-              echo "| \`$FNAME\` | $FSIZE | [⬇️ Download from workflow artifact]($FRUN_URL) |" >> "$BODY"
+              echo "| \`$FNAME\` | $FSIZE |[⬇️ Download from workflow artifact]($FRUN_URL) |" >> "$BODY"
             done < /tmp/oversized_files.txt
 
             echo "" >> "$BODY"
@@ -1050,7 +1041,7 @@ jobs:
           > Verify integrity with: \`sha256sum -c checksums.txt\`
 
           ---
-          > _Released by @${{ github.actor }} — [View workflow run](${{ steps.meta.outputs.run_url }})_
+          > _Released by @${{ github.actor }} —[View workflow run](${{ steps.meta.outputs.run_url }})_
           MDEOF
 
           echo "body_file=$BODY" >> "$GITHUB_OUTPUT"
@@ -1073,18 +1064,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ── 19. Delete artifact after release (optional) ──────────────────────────
-      # Fix 1B: If oversized files exist, the artifact is the ONLY place users
-      # can download them — the release body links directly to it. Deleting the
-      # artifact in that situation would create permanent broken links.
-      # A preceding bash step writes HAS_OVERSIZED=true to $GITHUB_ENV when
-      # oversized files are detected; the actual deletion action only runs when
-      # that flag is absent. This is necessary because YAML `if:` expressions
-      # cannot read /tmp files directly — only env vars and step outputs.
       - name: Check oversized files before artifact deletion
         id: oversized-check
         if: ${{ inputs.dry_run != true && inputs.delete_artifact_after_release == true }}
         run: |
-          if [ -s /tmp/oversized_files.txt ]; then
+          if[ -s /tmp/oversized_files.txt ]; then
             echo "::warning::Artifact deletion skipped — the artifact contains oversized file(s) linked from the release body. Deleting it would create broken download links."
             echo "Files preserved in artifact:"
             cut -d'|' -f1 /tmp/oversized_files.txt
@@ -1099,8 +1083,8 @@ jobs:
         with:
           name: release-${{ steps.tag.outputs.tag }}
           failOnError: false
-      # ── 20. Write job summary ─────────────────────────────────────────────────
 
+      # ── 20. Write job summary ─────────────────────────────────────────────────
       - name: Write job summary
         if: always()
         run: |
@@ -1119,8 +1103,7 @@ jobs:
             echo "| **ClamAV definitions** | $( [ "$CL_HIT" = "true" ] && echo "✅ Hit (freshclam skipped)" || echo "❌ Miss (freshclam ran)" ) |"
             echo ""
 
-            # Oversized file notice in summary
-            if [ -s /tmp/oversized_files.txt ]; then
+            if[ -s /tmp/oversized_files.txt ]; then
               echo "## ⚠️ Oversized Files (excluded from release)"
               echo "| Filename | Size | Workflow Run |"
               echo "|---|---|---|"
@@ -1132,8 +1115,7 @@ jobs:
 
             IDX=0
             while IFS= read -r URL; do
-              IDX=$((IDX+1))
-              [ -f "/tmp/meta_${IDX}.env" ] || continue
+              IDX=$((IDX+1))[ -f "/tmp/meta_${IDX}.env" ] || continue
               source "/tmp/meta_${IDX}.env"
               SRC=$(cat "/tmp/source_type_${IDX}.txt" 2>/dev/null || echo "unknown")
               VT="— (not checked)"
@@ -1161,7 +1143,7 @@ jobs:
             echo "| **ClamAV** | ${{ steps.clamav.outputs.scan_summary }} |"
             echo ""
 
-            if [ "$DRY" = "true" ]; then
+            if[ "$DRY" = "true" ]; then
               echo "## 🧪 Dry Run — Skipped Steps"
               echo "| Step | Status |"
               echo "|---|---|"
@@ -1186,8 +1168,7 @@ jobs:
           echo "════════════════════════════════════════════════════════"
           IDX=0
           while IFS= read -r URL; do
-            IDX=$((IDX+1))
-            [ -f "/tmp/meta_${IDX}.env" ] || continue
+            IDX=$((IDX+1))[ -f "/tmp/meta_${IDX}.env" ] || continue
             source "/tmp/meta_${IDX}.env"
             printf "  %-12s %s\n"             "File $IDX:"  "$FILENAME"
             printf "  %-12s %s (%s bytes)\n"  "Size:"       "$SIZE_HUMAN" "$SIZE_BYTES"
@@ -1196,7 +1177,7 @@ jobs:
             printf "  %-12s %s\n"             "Speed:"      "$SPEED_HUMAN"
             echo   "  ────────────────────────────────────────────────────"
           done < /tmp/urls.txt
-          [ "$DRY" != "true" ] && [ -n "$RELEASE_URL" ] && \
+          [ "$DRY" != "true" ] &&[ -n "$RELEASE_URL" ] && \
             printf "  %-12s %s\n" "Release:" "$RELEASE_URL"
           echo "════════════════════════════════════════════════════════"
 
@@ -1234,7 +1215,6 @@ jobs:
           with open('/tmp/filenames.txt') as f:
               filenames = [l.strip() for l in f if l.strip()]
 
-          # Note oversized files in the Discord embed
           oversized = {}
           if os.path.exists('/tmp/oversized_files.txt'):
               for line in open('/tmp/oversized_files.txt').read().strip().splitlines():
@@ -1242,7 +1222,7 @@ jobs:
                   if len(parts) == 3:
                       oversized[parts[0]] = parts[1]
 
-          fields = []
+          fields =[]
           for i, fn in enumerate(filenames):
               label = f"File {i+1}"
               value = f"`{fn}`"
@@ -1250,7 +1230,7 @@ jobs:
                   value += f"\n⚠️ {oversized[fn]} — too large for release, see artifact"
               fields.append({"name": label, "value": value, "inline": True})
 
-          fields += [
+          fields +=[
               {"name": "Release", "value": os.environ.get("RELEASE_URL", "—"), "inline": False},
               {"name": "ClamAV",  "value": os.environ.get("CLAMAV", "—"),      "inline": True},
           ]
@@ -1298,7 +1278,7 @@ jobs:
                   if len(parts) == 3:
                       oversized[parts[0]] = (parts[1], parts[2])
 
-          file_lines = []
+          file_lines =[]
           for fn in filenames:
               if fn in oversized:
                   size, run_url = oversized[fn]
@@ -1307,17 +1287,17 @@ jobs:
                   file_lines.append(f"• `{fn}`")
           file_list = "\n".join(file_lines)
 
-          payload = {"blocks": [
+          payload = {"blocks":[
               {"type": "header",
                "text": {"type": "plain_text",
                         "text": f"📦 New Release: {os.environ['TAG']}"}},
               {"type": "section",
-               "fields": [
+               "fields":[
                    {"type": "mrkdwn", "text": f"*Files:*\n{file_list}"},
                    {"type": "mrkdwn", "text": f"*ClamAV:*\n{os.environ.get('CLAMAV','—')}"},
                    {"type": "mrkdwn", "text": f"*Repo:*\n{os.environ.get('REPO')}"},
                ]},
-              {"type": "actions", "elements": [{
+              {"type": "actions", "elements":[{
                   "type": "button",
                   "text": {"type": "plain_text", "text": "View Release"},
                   "url":  os.environ.get("RELEASE_URL", "")
@@ -1350,7 +1330,7 @@ jobs:
           import os, urllib.request, urllib.parse
 
           with open('/tmp/filenames.txt') as f:
-              filenames = [l.strip() for l in f if l.strip()]
+              filenames =[l.strip() for l in f if l.strip()]
 
           oversized = {}
           if os.path.exists('/tmp/oversized_files.txt'):
@@ -1360,10 +1340,9 @@ jobs:
                       oversized[parts[0]] = (parts[1], parts[2])
 
           def html_escape(s):
-              """Escape the five XML/HTML special chars Telegram HTML mode requires."""
               return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;")
 
-          file_lines = []
+          file_lines =[]
           for fn in filenames:
               if fn in oversized:
                   size, run_url = oversized[fn]
@@ -1375,9 +1354,6 @@ jobs:
                   file_lines.append(f"  • <code>{html_escape(fn)}</code>")
           file_list = "\n".join(file_lines)
 
-          # Fix 1A: Use parse_mode=HTML — the legacy Markdown parser breaks on
-          # underscores/asterisks inside filenames (e.g. my_app_v1.0.zip → 400 error).
-          # HTML mode is Telegram's recommended replacement and is safely escaped above.
           text = (
               f"<b>📦 New Release: {html_escape(os.environ['TAG'])}</b>\n"
               f"Files:\n{file_list}\n"
