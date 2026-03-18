@@ -35,8 +35,8 @@ jobs:
               meta="$line"
             elif [[ "$line" == http* ]]; then
               url="$line"
-              # Probe the stream: 10s timeout, just fetch a tiny bit
-              if curl --silent --max-time 10 --output /dev/null --head "$url"; then
+              # Probe the stream: 2s timeout, just fetch a tiny bit
+              if curl --silent --max-time 2 --output /dev/null --head "$url"; then
                 echo "$meta" >> "$TEMP"
                 echo "$url"  >> "$TEMP"
               else
