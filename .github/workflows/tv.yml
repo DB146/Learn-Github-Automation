@@ -1,34 +1,81 @@
 name: Auto Download and Update TV
-
 on:
   schedule:
-    - cron: "0 0 * * 1,4"   
-  workflow_dispatch:        # Allow manual trigger
+    - cron: "0 0 * * 1,4"
+  workflow_dispatch:
 
 jobs:
   update-file:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        
+
       - name: Download file
         run: |
           DOWNLOAD_URL="https://vnnhan.com/tv.m3u8"
           OUTPUT_PATH="tv.m3u8"
-
           mkdir -p "$(dirname "$OUTPUT_PATH")"
           curl -L "$DOWNLOAD_URL" -o "$OUTPUT_PATH"
+
+      - name: Check and filter dead channels
+        run: |
+          INPUT="tv.m3u8"
+          TEMP="tv_filtered.m3u8"
+          DEAD_LOG="dead_channels.txt"
+
+          echo "#EXTM3U" > "$TEMP"
+          > "$DEAD_LOG"
+
+          # Read the file line by line, pairing #EXTINF with its URL
+          while IFS= read -r line; do
+            if [[ "$line" == "#EXTM3U"* ]]; then
+              continue  # Already written the header
+            elif [[ "$line" == "#EXTINF"* ]]; then
+              meta="$line"
+            elif [[ "$line" == http* ]]; then
+              url="$line"
+              # Probe the stream: 10s timeout, just fetch a tiny bit
+              if curl --silent --max-time 10 --output /dev/null --head "$url"; then
+                echo "$meta" >> "$TEMP"
+                echo "$url"  >> "$TEMP"
+              else
+                # Try a range request in case HEAD is blocked
+                if curl --silent --max-time 10 --output /dev/null \
+                        --range 0-1024 "$url"; then
+                  echo "$meta" >> "$TEMP"
+                  echo "$url"  >> "$TEMP"
+                else
+                  channel_name=$(echo "$meta" | grep -oP '(?<=,).*$')
+                  echo "DEAD: $channel_name → $url"
+                  echo "$channel_name | $url" >> "$DEAD_LOG"
+                fi
+              fi
+            fi
+          done < "$INPUT"
+
+          mv "$TEMP" "$INPUT"
+
+          echo ""
+          echo "=== Dead channels ==="
+          cat "$DEAD_LOG" || echo "None"
+          echo "Dead count: $(wc -l < "$DEAD_LOG")"
+
+      - name: Upload dead channels log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dead-channels-${{ github.run_id }}
+          path: dead_channels.txt
 
       - name: Commit changes
         run: |
           git config --global user.email "github-actions@users.noreply.github.com"
           git config --global user.name "GitHub Actions"
-          
+
           if [[ -n "$(git status --porcelain)" ]]; then
             git add .
-            git commit -m "Auto-update TV"
+            git commit -m "Auto-update TV (dead channels removed)"
             git push
           else
             echo "No changes detected."
