@@ -13,7 +13,7 @@ jobs:
 
       - name: Download file
         run: |
-          DOWNLOAD_URL="https://vnnhan.com/tv.m3u8"
+          DOWNLOAD_URL="https://raw.githubusercontent.com/vuminhthanh12/vuminhthanh12/refs/heads/main/vmttv"
           OUTPUT_PATH="tv.m3u8"
           mkdir -p "$(dirname "$OUTPUT_PATH")"
           curl -L "$DOWNLOAD_URL" -o "$OUTPUT_PATH"
