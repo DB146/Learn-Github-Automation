@@ -1,4 +1,5 @@
-[Made-For-Advertisement Blocklist]
+! Title: Made-For-Advertisement Blocklist
+! Expires: 14 days (update frequency)
 ||metaqore.net^
 ||modabright.net^
 ||thumpnews.com^
