@@ -1,4 +1,12 @@
 [Made-For-Advertisement Blocklist]
-metaqore.net
+||metaqore.net^
+||modabright.net^
+||thumpnews.com^
+||mobileera.net^
+||futurebyte.net^
+||tasteezy.net^
+||flavorvoyage.net^
+||phonevibe.net^
+||quantixa.net^
 
 
