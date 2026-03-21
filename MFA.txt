@@ -1,0 +1,4 @@
+[Made-For-Advertisement Blocklist]
+metaqore.net
+
+

@@ -1,6 +1,0 @@
-!dethi2026.mapstudy.vn
-dethi2026.mapstudy.vn###SECTION_POPUP
-dethi2026.mapstudy.vn##.backdrop-popup
-dethi2026.mapstudy.vn##body:style(overflow: auto !important;)
-
-
