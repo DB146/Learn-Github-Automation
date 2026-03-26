@@ -232,7 +232,7 @@ jobs:
 
       - name: AI-assisted build command extraction
         id: ai
-        if: github.event.inputs.anthropic_assisted == 'true' && secrets.ANTHROPIC_API_KEY != ''
+        if: github.event.inputs.anthropic_assisted == 'true' && env.ANTHROPIC_API_KEY != ''
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
@@ -409,3 +409,177 @@ jobs:
           echo "| Install Command | \`${{ steps.resolve.outputs.final_install }}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Build Command | \`${{ steps.resolve.outputs.final_build }}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| AI Assisted | \`${{ github.event.inputs.anthropic_assisted }}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+  # ─────────────────────────────────────────────
+  # JOB 4 — Notify
+  # Runs after build regardless of success/failure.
+  # Each channel is gated on its own secret(s) being
+  # present, so unused channels are silently skipped.
+  # ─────────────────────────────────────────────
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [clone, read-instructions, build]
+    # Always run so we can report failures too
+    if: always()
+    env:
+      BUILD_STATUS:  ${{ needs.build.result }}        # success | failure | cancelled
+      REPO_URL:      ${{ github.event.inputs.repo_url }}
+      REPO_REF:      ${{ github.event.inputs.repo_ref }}
+      REPO_NAME:     ${{ needs.clone.outputs.repo_name }}
+      RUNTIME:       ${{ needs.read-instructions.outputs.runtime }}
+      BUILD_TOOL:    ${{ needs.read-instructions.outputs.build_tool }}
+      RUN_URL:       ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      # ── Shared message builder ───────────────
+      - name: Compose notification message
+        id: msg
+        run: |
+          if [ "$BUILD_STATUS" = "success" ]; then
+            EMOJI="✅"
+            STATUS_LABEL="succeeded"
+          else
+            EMOJI="❌"
+            STATUS_LABEL="FAILED"
+          fi
+
+          SHORT_MSG="${EMOJI} Build ${STATUS_LABEL}: ${REPO_NAME} (${REPO_REF})"
+          LONG_MSG="${EMOJI} *Auto-build ${STATUS_LABEL}*
+Repo:    ${REPO_URL}
+Ref:     ${REPO_REF}
+Runtime: ${RUNTIME} / ${BUILD_TOOL}
+Run:     ${RUN_URL}"
+
+          # Export for later steps
+          echo "short=$SHORT_MSG"         >> "$GITHUB_OUTPUT"
+          # Multiline-safe
+          echo "long<<MSGEOF"             >> "$GITHUB_OUTPUT"
+          echo "$LONG_MSG"                >> "$GITHUB_OUTPUT"
+          echo "MSGEOF"                   >> "$GITHUB_OUTPUT"
+
+          echo "emoji=$EMOJI"             >> "$GITHUB_OUTPUT"
+          echo "status_label=$STATUS_LABEL" >> "$GITHUB_OUTPUT"
+
+      # ── 1. Slack ─────────────────────────────
+      # Requires secret: SLACK_WEBHOOK_URL
+      # Get one at: Slack → Apps → Incoming Webhooks
+      - name: Notify Slack
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -sf -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg text "${{ steps.msg.outputs.short }}" \
+              --arg color "$( [ '${{ env.BUILD_STATUS }}' = 'success' ] && echo 'good' || echo 'danger' )" \
+              --arg fallback "${{ steps.msg.outputs.short }}" \
+              --arg repo "${{ env.REPO_URL }}" \
+              --arg ref "${{ env.REPO_REF }}" \
+              --arg runtime "${{ env.RUNTIME }} / ${{ env.BUILD_TOOL }}" \
+              --arg run_url "${{ env.RUN_URL }}" \
+              '{
+                attachments: [{
+                  color: $color,
+                  fallback: $fallback,
+                  title: $text,
+                  fields: [
+                    { title: "Repository", value: $repo,    short: false },
+                    { title: "Ref",        value: $ref,     short: true  },
+                    { title: "Runtime",    value: $runtime, short: true  },
+                    { title: "Run",        value: $run_url, short: false }
+                  ]
+                }]
+              }')"
+          echo "Slack notified."
+
+      # ── 2. Email (via SendGrid) ───────────────
+      # Requires secrets: SENDGRID_API_KEY, NOTIFY_EMAIL_TO, NOTIFY_EMAIL_FROM
+      # Sign up free at: https://sendgrid.com
+      - name: Notify via Email (SendGrid)
+        if: ${{ env.SENDGRID_API_KEY != '' && env.NOTIFY_EMAIL_TO != '' }}
+        env:
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          NOTIFY_EMAIL_TO:  ${{ secrets.NOTIFY_EMAIL_TO }}
+          NOTIFY_EMAIL_FROM: ${{ secrets.NOTIFY_EMAIL_FROM }}
+        run: |
+          SUBJECT="${{ steps.msg.outputs.short }}"
+          BODY_HTML="<h2>${{ steps.msg.outputs.short }}</h2>
+          <table>
+            <tr><td><b>Repository</b></td><td>${{ env.REPO_URL }}</td></tr>
+            <tr><td><b>Ref</b></td><td>${{ env.REPO_REF }}</td></tr>
+            <tr><td><b>Runtime</b></td><td>${{ env.RUNTIME }} / ${{ env.BUILD_TOOL }}</td></tr>
+            <tr><td><b>Status</b></td><td>${{ env.BUILD_STATUS }}</td></tr>
+            <tr><td><b>Run logs</b></td><td><a href='${{ env.RUN_URL }}'>View run</a></td></tr>
+          </table>"
+
+          curl -sf "https://api.sendgrid.com/v3/mail/send" \
+            -H "Authorization: Bearer $SENDGRID_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg from  "${NOTIFY_EMAIL_FROM:-noreply@github-actions.local}" \
+              --arg to    "$NOTIFY_EMAIL_TO" \
+              --arg subj  "$SUBJECT" \
+              --arg html  "$BODY_HTML" \
+              '{
+                personalizations: [{ to: [{ email: $to }] }],
+                from: { email: $from },
+                subject: $subj,
+                content: [{ type: "text/html", value: $html }]
+              }')"
+          echo "Email sent to $NOTIFY_EMAIL_TO."
+
+      # ── 3. GitHub Issue on YOUR OWN repo ─────
+      # No extra token needed — uses the built-in GITHUB_TOKEN.
+      - name: Open GitHub Issue on this repo
+        if: ${{ env.OPEN_SELF_ISSUE == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPEN_SELF_ISSUE: ${{ vars.OPEN_SELF_ISSUE }}   # set to 'true' in repo Variables
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "${{ steps.msg.outputs.short }}" \
+            --body  "$(printf '%s' '${{ steps.msg.outputs.long }}')" \
+            --label "$( [ '${{ env.BUILD_STATUS }}' = 'success' ] && echo 'build-success' || echo 'build-failure' )" \
+          || echo "Issue creation skipped (label may not exist — create it first)."
+
+      # ── 5. Microsoft Teams ───────────────────
+      # Requires secret: TEAMS_WEBHOOK_URL
+      # Get one via Teams → channel → Connectors → Incoming Webhook
+      - name: Notify Microsoft Teams
+        if: ${{ env.TEAMS_WEBHOOK_URL != '' }}
+        env:
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        run: |
+          COLOR="${{ env.BUILD_STATUS == 'success' && '00b300' || 'cc0000' }}"
+          curl -sf -X POST "$TEAMS_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg title  "${{ steps.msg.outputs.short }}" \
+              --arg repo   "${{ env.REPO_URL }}" \
+              --arg ref    "${{ env.REPO_REF }}" \
+              --arg rt     "${{ env.RUNTIME }} / ${{ env.BUILD_TOOL }}" \
+              --arg run    "${{ env.RUN_URL }}" \
+              --arg color  "$COLOR" \
+              '{
+                "@type": "MessageCard",
+                "@context": "http://schema.org/extensions",
+                themeColor: $color,
+                summary: $title,
+                sections: [{
+                  activityTitle: $title,
+                  facts: [
+                    { name: "Repository", value: $repo },
+                    { name: "Ref",        value: $ref  },
+                    { name: "Runtime",    value: $rt   }
+                  ]
+                }],
+                potentialAction: [{
+                  "@type": "OpenUri",
+                  name: "View Run",
+                  targets: [{ os: "default", uri: $run }]
+                }]
+              }')"
+          echo "Teams notified."
