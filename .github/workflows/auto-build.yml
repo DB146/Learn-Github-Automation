@@ -445,11 +445,7 @@ jobs:
           fi
 
           SHORT_MSG="${EMOJI} Build ${STATUS_LABEL}: ${REPO_NAME} (${REPO_REF})"
-          LONG_MSG="${EMOJI} *Auto-build ${STATUS_LABEL}*
-Repo:    ${REPO_URL}
-Ref:     ${REPO_REF}
-Runtime: ${RUNTIME} / ${BUILD_TOOL}
-Run:     ${RUN_URL}"
+          LONG_MSG="${EMOJI} *Auto-build ${STATUS_LABEL}*\nRepo:    ${REPO_URL}\nRef:     ${REPO_REF}\nRuntime: ${RUNTIME} / ${BUILD_TOOL}\nRun:     ${RUN_URL}"
 
           # Export for later steps
           echo "short=$SHORT_MSG"         >> "$GITHUB_OUTPUT"
