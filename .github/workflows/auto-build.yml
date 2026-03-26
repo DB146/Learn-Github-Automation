@@ -365,6 +365,15 @@ jobs:
           echo "Running: ${{ steps.resolve.outputs.final_install }}"
           ${{ steps.resolve.outputs.final_install }}
 
+      # ── Fix wrapper permissions (Gradle/Maven/scripts) ──
+      - name: Fix executable permissions
+        working-directory: ${{ env.TARGET_DIR }}
+        run: |
+          [ -f "gradlew" ] && chmod +x gradlew
+          [ -f "mvnw" ]    && chmod +x mvnw
+          find . -maxdepth 2 -name "*.sh" -exec chmod +x {} +
+          true
+
       # ── Build ────────────────────────────────
       - name: Build application
         working-directory: ${{ env.TARGET_DIR }}
