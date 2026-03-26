@@ -1,0 +1,411 @@
+name: Auto Clone & Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_url:
+        description: "GitHub repository URL to clone (e.g. https://github.com/owner/repo)"
+        required: true
+        type: string
+      repo_ref:
+        description: "Branch, tag, or commit SHA to checkout (default: main)"
+        required: false
+        default: "main"
+        type: string
+      anthropic_assisted:
+        description: "Use Claude AI to interpret build instructions"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+env:
+  TARGET_DIR: target-repo
+
+jobs:
+  # ─────────────────────────────────────────────
+  # JOB 1 — Clone the target repository
+  # ─────────────────────────────────────────────
+  clone:
+    name: Clone Repository
+    runs-on: ubuntu-latest
+    outputs:
+      repo_name: ${{ steps.meta.outputs.repo_name }}
+    steps:
+      - name: Checkout action repo (for shared scripts)
+        uses: actions/checkout@v4
+        with:
+          path: action-repo
+
+      - name: Clone target repository
+        run: |
+          echo "::group::Cloning ${{ github.event.inputs.repo_url }} @ ${{ github.event.inputs.repo_ref }}"
+          git clone --depth 1 \
+            --branch "${{ github.event.inputs.repo_ref }}" \
+            "${{ github.event.inputs.repo_url }}" \
+            "$TARGET_DIR" || \
+          git clone --depth 1 \
+            "${{ github.event.inputs.repo_url }}" \
+            "$TARGET_DIR"
+          echo "::endgroup::"
+
+      - name: Extract repository metadata
+        id: meta
+        run: |
+          REPO_NAME=$(basename "${{ github.event.inputs.repo_url }}" .git)
+          echo "repo_name=$REPO_NAME" >> "$GITHUB_OUTPUT"
+          echo "Cloned: $REPO_NAME"
+          echo "Commit: $(git -C $TARGET_DIR rev-parse HEAD)"
+
+      - name: Upload cloned repo as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloned-repo
+          path: ${{ env.TARGET_DIR }}
+          retention-days: 1
+
+  # ─────────────────────────────────────────────
+  # JOB 2 — Read & parse build instructions
+  # ─────────────────────────────────────────────
+  read-instructions:
+    name: Read Build Instructions
+    runs-on: ubuntu-latest
+    needs: clone
+    outputs:
+      build_tool:    ${{ steps.detect.outputs.build_tool }}
+      build_command: ${{ steps.detect.outputs.build_command }}
+      install_command: ${{ steps.detect.outputs.install_command }}
+      runtime:       ${{ steps.detect.outputs.runtime }}
+      ai_commands:   ${{ steps.ai.outputs.ai_commands }}
+    steps:
+      - name: Download cloned repo
+        uses: actions/download-artifact@v4
+        with:
+          name: cloned-repo
+          path: ${{ env.TARGET_DIR }}
+
+      - name: Detect build tool & parse instructions
+        id: detect
+        run: |
+          cd "$TARGET_DIR"
+
+          BUILD_TOOL="unknown"
+          BUILD_CMD=""
+          INSTALL_CMD=""
+          RUNTIME=""
+
+          # ── Node / JS / TS ──────────────────────────────────
+          if [ -f "package.json" ]; then
+            RUNTIME="node"
+            BUILD_TOOL="npm"
+            [ -f "yarn.lock" ]        && BUILD_TOOL="yarn"
+            [ -f "pnpm-lock.yaml" ]   && BUILD_TOOL="pnpm"
+            [ -f "bun.lockb" ]        && BUILD_TOOL="bun"
+
+            # Read scripts from package.json
+            BUILD_SCRIPT=$(node -pe "require('./package.json').scripts?.build  || ''" 2>/dev/null || true)
+            START_SCRIPT=$(node -pe "require('./package.json').scripts?.start  || ''" 2>/dev/null || true)
+
+            case "$BUILD_TOOL" in
+              yarn) INSTALL_CMD="yarn install --frozen-lockfile"
+                    BUILD_CMD="yarn build" ;;
+              pnpm) INSTALL_CMD="pnpm install --frozen-lockfile"
+                    BUILD_CMD="pnpm build" ;;
+              bun)  INSTALL_CMD="bun install"
+                    BUILD_CMD="bun run build" ;;
+              *)    INSTALL_CMD="npm ci"
+                    BUILD_CMD="npm run build" ;;
+            esac
+
+            # If no 'build' script found, fall back to 'start'
+            [ -z "$BUILD_SCRIPT" ] && [ -n "$START_SCRIPT" ] && BUILD_CMD="${BUILD_TOOL} run start"
+          fi
+
+          # ── Python ──────────────────────────────────────────
+          if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "setup.cfg" ]; then
+            RUNTIME="python"
+            BUILD_TOOL="pip"
+            [ -f "pyproject.toml" ] && grep -q "\[tool.poetry\]" pyproject.toml && BUILD_TOOL="poetry"
+            [ -f "Pipfile" ]          && BUILD_TOOL="pipenv"
+            [ -f "requirements.txt" ] && BUILD_TOOL="pip"
+
+            case "$BUILD_TOOL" in
+              poetry)  INSTALL_CMD="poetry install --no-root"
+                       BUILD_CMD="poetry build" ;;
+              pipenv)  INSTALL_CMD="pipenv install"
+                       BUILD_CMD="pipenv run build" ;;
+              *)       INSTALL_CMD="pip install -r requirements.txt"
+                       BUILD_CMD="python -m build" ;;
+            esac
+          fi
+
+          # ── Java / Gradle ────────────────────────────────────
+          if [ -f "gradlew" ] || [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+            RUNTIME="java"
+            BUILD_TOOL="gradle"
+            INSTALL_CMD=""
+            BUILD_CMD="./gradlew build --no-daemon"
+            [ ! -x "gradlew" ] && chmod +x gradlew 2>/dev/null || true
+          fi
+
+          # ── Java / Maven ─────────────────────────────────────
+          if [ -f "pom.xml" ]; then
+            RUNTIME="java"
+            BUILD_TOOL="maven"
+            INSTALL_CMD=""
+            BUILD_CMD="mvn package -DskipTests --batch-mode"
+          fi
+
+          # ── Go ───────────────────────────────────────────────
+          if [ -f "go.mod" ]; then
+            RUNTIME="go"
+            BUILD_TOOL="go"
+            INSTALL_CMD="go mod download"
+            BUILD_CMD="go build ./..."
+          fi
+
+          # ── Rust ─────────────────────────────────────────────
+          if [ -f "Cargo.toml" ]; then
+            RUNTIME="rust"
+            BUILD_TOOL="cargo"
+            INSTALL_CMD=""
+            BUILD_CMD="cargo build --release"
+          fi
+
+          # ── Ruby ─────────────────────────────────────────────
+          if [ -f "Gemfile" ]; then
+            RUNTIME="ruby"
+            BUILD_TOOL="bundler"
+            INSTALL_CMD="bundle install"
+            BUILD_CMD="bundle exec rake build"
+          fi
+
+          # ── Makefile fallback ────────────────────────────────
+          if [ "$BUILD_TOOL" = "unknown" ] && [ -f "Makefile" ]; then
+            BUILD_TOOL="make"
+            INSTALL_CMD=""
+            BUILD_CMD="make"
+          fi
+
+          # ── Docker fallback ──────────────────────────────────
+          if [ "$BUILD_TOOL" = "unknown" ] && [ -f "Dockerfile" ]; then
+            BUILD_TOOL="docker"
+            INSTALL_CMD=""
+            BUILD_CMD="docker build -t auto-build ."
+          fi
+
+          echo "build_tool=$BUILD_TOOL"       >> "$GITHUB_OUTPUT"
+          echo "build_command=$BUILD_CMD"     >> "$GITHUB_OUTPUT"
+          echo "install_command=$INSTALL_CMD" >> "$GITHUB_OUTPUT"
+          echo "runtime=$RUNTIME"             >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "┌─────────────────────────────────┐"
+          echo "│  Detected Build Configuration   │"
+          echo "├─────────────────────────────────┤"
+          printf "│  Runtime : %-22s│\n" "$RUNTIME"
+          printf "│  Tool    : %-22s│\n" "$BUILD_TOOL"
+          printf "│  Install : %-22s│\n" "$INSTALL_CMD"
+          printf "│  Build   : %-22s│\n" "$BUILD_CMD"
+          echo "└─────────────────────────────────┘"
+
+      - name: Collect README for AI analysis
+        id: readme
+        run: |
+          cd "$TARGET_DIR"
+          README_CONTENT=""
+
+          for f in README.md README.rst README.txt readme.md CONTRIBUTING.md BUILDING.md BUILD.md; do
+            if [ -f "$f" ]; then
+              echo "Found: $f"
+              README_CONTENT=$(head -c 4000 "$f")   # cap at 4 KB for API
+              break
+            fi
+          done
+
+          # Escape for multiline env var
+          echo "readme_content<<READMEEOF" >> "$GITHUB_ENV"
+          echo "$README_CONTENT"           >> "$GITHUB_ENV"
+          echo "READMEEOF"                 >> "$GITHUB_ENV"
+
+      - name: AI-assisted build command extraction
+        id: ai
+        if: github.event.inputs.anthropic_assisted == 'true' && secrets.ANTHROPIC_API_KEY != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "Calling Claude to parse build instructions from README…"
+
+          PAYLOAD=$(jq -n \
+            --arg readme "$readme_content" \
+            --arg tool    "${{ steps.detect.outputs.build_tool }}" \
+            --arg build   "${{ steps.detect.outputs.build_command }}" \
+            --arg install "${{ steps.detect.outputs.install_command }}" \
+            '{
+              model: "claude-sonnet-4-20250514",
+              max_tokens: 512,
+              messages: [{
+                role: "user",
+                content: ("You are a build engineer. Given the README and detected tooling, output ONLY a JSON object with keys: install_command, build_command, test_command, notes.\nDetected tool: " + $tool + "\nDetected build: " + $build + "\nDetected install: " + $install + "\nREADME (truncated):\n" + $readme)
+              }]
+            }')
+
+          RESPONSE=$(curl -sf https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$PAYLOAD")
+
+          AI_TEXT=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+          echo "AI raw response: $AI_TEXT"
+
+          # Extract JSON block from the AI response
+          AI_JSON=$(echo "$AI_TEXT" | python3 -c "
+          import sys, re, json
+          text = sys.stdin.read()
+          match = re.search(r'\{.*\}', text, re.DOTALL)
+          if match:
+            try:
+              obj = json.loads(match.group())
+              print(json.dumps(obj))
+            except:
+              print('{}')
+          else:
+            print('{}')
+          ")
+
+          echo "ai_commands=$AI_JSON" >> "$GITHUB_OUTPUT"
+          echo "Parsed AI commands: $AI_JSON"
+
+  # ─────────────────────────────────────────────
+  # JOB 3 — Build the application
+  # ─────────────────────────────────────────────
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: [clone, read-instructions]
+    steps:
+      - name: Download cloned repo
+        uses: actions/download-artifact@v4
+        with:
+          name: cloned-repo
+          path: ${{ env.TARGET_DIR }}
+
+      # ── Runtime setup ─────────────────────────
+      - name: Setup Node.js
+        if: needs.read-instructions.outputs.runtime == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Setup Python
+        if: needs.read-instructions.outputs.runtime == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Setup Java
+        if: needs.read-instructions.outputs.runtime == 'java'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Go
+        if: needs.read-instructions.outputs.runtime == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Setup Rust
+        if: needs.read-instructions.outputs.runtime == 'rust'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Ruby
+        if: needs.read-instructions.outputs.runtime == 'ruby'
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      # ── Resolve final build commands (AI overrides native detection) ──
+      - name: Resolve build commands
+        id: resolve
+        run: |
+          AI_JSON='${{ needs.read-instructions.outputs.ai_commands }}'
+          NATIVE_INSTALL='${{ needs.read-instructions.outputs.install_command }}'
+          NATIVE_BUILD='${{ needs.read-instructions.outputs.build_command }}'
+
+          AI_INSTALL=$(echo "$AI_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('install_command',''))" 2>/dev/null || echo "")
+          AI_BUILD=$(echo   "$AI_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('build_command',''))"   2>/dev/null || echo "")
+          AI_TEST=$(echo    "$AI_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('test_command',''))"    2>/dev/null || echo "")
+          AI_NOTES=$(echo   "$AI_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('notes',''))"          2>/dev/null || echo "")
+
+          FINAL_INSTALL="${AI_INSTALL:-$NATIVE_INSTALL}"
+          FINAL_BUILD="${AI_BUILD:-$NATIVE_BUILD}"
+
+          echo "final_install=$FINAL_INSTALL" >> "$GITHUB_OUTPUT"
+          echo "final_build=$FINAL_BUILD"     >> "$GITHUB_OUTPUT"
+          echo "final_test=$AI_TEST"          >> "$GITHUB_OUTPUT"
+
+          echo "──────────────────────────────────────"
+          echo "  Final resolved commands"
+          echo "  Install : $FINAL_INSTALL"
+          echo "  Build   : $FINAL_BUILD"
+          echo "  Test    : $AI_TEST"
+          [ -n "$AI_NOTES" ] && echo "  AI Notes: $AI_NOTES"
+          echo "──────────────────────────────────────"
+
+      # ── Install dependencies ─────────────────
+      - name: Install dependencies
+        if: steps.resolve.outputs.final_install != ''
+        working-directory: ${{ env.TARGET_DIR }}
+        run: |
+          echo "Running: ${{ steps.resolve.outputs.final_install }}"
+          ${{ steps.resolve.outputs.final_install }}
+
+      # ── Build ────────────────────────────────
+      - name: Build application
+        working-directory: ${{ env.TARGET_DIR }}
+        run: |
+          echo "Running: ${{ steps.resolve.outputs.final_build }}"
+          ${{ steps.resolve.outputs.final_build }}
+
+      # ── Optional test step ───────────────────
+      - name: Run tests
+        if: steps.resolve.outputs.final_test != ''
+        working-directory: ${{ env.TARGET_DIR }}
+        continue-on-error: true
+        run: |
+          echo "Running: ${{ steps.resolve.outputs.final_test }}"
+          ${{ steps.resolve.outputs.final_test }}
+
+      # ── Upload build artifacts ───────────────
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output-${{ needs.clone.outputs.repo_name }}
+          path: |
+            ${{ env.TARGET_DIR }}/dist
+            ${{ env.TARGET_DIR }}/build
+            ${{ env.TARGET_DIR }}/out
+            ${{ env.TARGET_DIR }}/target
+            ${{ env.TARGET_DIR }}/*.jar
+            ${{ env.TARGET_DIR }}/*.whl
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Build summary
+        run: |
+          echo "## ✅ Build Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Repository | \`${{ github.event.inputs.repo_url }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Ref | \`${{ github.event.inputs.repo_ref }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Runtime | \`${{ needs.read-instructions.outputs.runtime }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Build Tool | \`${{ needs.read-instructions.outputs.build_tool }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Install Command | \`${{ steps.resolve.outputs.final_install }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Build Command | \`${{ steps.resolve.outputs.final_build }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| AI Assisted | \`${{ github.event.inputs.anthropic_assisted }}\` |" >> "$GITHUB_STEP_SUMMARY"
