@@ -1,0 +1,2 @@
+!Hiện reminder + recommend zalo vid discovery
+broadcast.api.zaloapp.com
