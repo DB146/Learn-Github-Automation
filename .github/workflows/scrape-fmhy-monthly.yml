@@ -1,0 +1,143 @@
+name: Scrape FMHY Docs Monthly
+
+on:
+  schedule:
+    # Runs at 00:00 UTC on the 1st of every month
+    - cron: "0 0 1 * *"
+  workflow_dispatch: # Allow manual trigger for testing
+
+permissions:
+  contents: write
+
+jobs:
+  scrape-and-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Compute folder names
+        id: folders
+        run: |
+          CURRENT=$(date -u +"%Y-%m")
+          PREVIOUS=$(date -u -d "1 month ago" +"%Y-%m")
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+          echo "previous=$PREVIOUS" >> $GITHUB_OUTPUT
+
+      - name: Rotate folders (current → previous)
+        run: |
+          CURRENT="${{ steps.folders.outputs.current }}"
+          PREVIOUS="${{ steps.folders.outputs.previous }}"
+
+          # If a current-month folder already exists from a prior run this month,
+          # promote it to the previous-month slot before overwriting.
+          if [ -d "fmhy/$CURRENT" ]; then
+            echo "Promoting fmhy/$CURRENT → fmhy/$PREVIOUS"
+            rm -rf "fmhy/$PREVIOUS"
+            mv "fmhy/$CURRENT" "fmhy/$PREVIOUS"
+          fi
+
+          mkdir -p "fmhy/$CURRENT"
+
+      - name: Scrape FMHY docs
+        env:
+          CURRENT_FOLDER: ${{ steps.folders.outputs.current }}
+        run: |
+          python - <<'EOF'
+          import os, re, time, requests
+          from urllib.parse import urljoin
+          from bs4 import BeautifulSoup
+
+          BASE_URL  = "https://github.com"
+          TREE_URL  = "https://github.com/fmhy/edit/tree/main/docs"
+          RAW_BASE  = "https://raw.githubusercontent.com/fmhy/edit/main/docs"
+          OUT_DIR   = os.path.join("fmhy", os.environ["CURRENT_FOLDER"])
+
+          HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; fmhy-scraper/1.0)"}
+          SESSION = requests.Session()
+          SESSION.headers.update(HEADERS)
+
+          def list_files(tree_url):
+              """Return list of (filename, raw_url) for every file in the tree page."""
+              resp = SESSION.get(tree_url, timeout=30)
+              resp.raise_for_status()
+              soup = BeautifulSoup(resp.text, "html.parser")
+
+              files = []
+              # GitHub renders file entries as <a> tags inside the file tree
+              for a in soup.select("a[href]"):
+                  href = a["href"]
+                  # Match blob links pointing into the docs folder
+                  m = re.match(r"^/fmhy/edit/blob/main/docs/(.+)$", href)
+                  if m:
+                      filename = m.group(1)
+                      raw_url  = f"{RAW_BASE}/{filename}"
+                      files.append((filename, raw_url))
+
+              return files
+
+          def download_file(raw_url, dest_path):
+              os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+              resp = SESSION.get(raw_url, timeout=30)
+              resp.raise_for_status()
+              with open(dest_path, "wb") as f:
+                  f.write(resp.content)
+
+          print(f"Listing files from: {TREE_URL}")
+          files = list_files(TREE_URL)
+
+          if not files:
+              raise SystemExit("No files found — the page structure may have changed.")
+
+          print(f"Found {len(files)} file(s). Downloading…")
+          for filename, raw_url in files:
+              dest = os.path.join(OUT_DIR, filename)
+              print(f"  ↓ {filename}")
+              download_file(raw_url, dest)
+              time.sleep(0.3)   # be polite to GitHub
+
+          print("Done.")
+          EOF
+
+      - name: Write manifest
+        env:
+          CURRENT_FOLDER: ${{ steps.folders.outputs.current }}
+        run: |
+          MANIFEST="fmhy/$CURRENT_FOLDER/MANIFEST.txt"
+          echo "Scraped: $(date -u --iso-8601=seconds)" > "$MANIFEST"
+          echo "Source : https://github.com/fmhy/edit/tree/main/docs" >> "$MANIFEST"
+          echo "" >> "$MANIFEST"
+          echo "Files:" >> "$MANIFEST"
+          find "fmhy/$CURRENT_FOLDER" -type f ! -name "MANIFEST.txt" \
+            | sort | sed "s|fmhy/$CURRENT_FOLDER/||" >> "$MANIFEST"
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add fmhy/
+
+          # Only commit when there are actual changes
+          if git diff --cached --quiet; then
+            echo "No changes detected — nothing to commit."
+          else
+            CURRENT="${{ steps.folders.outputs.current }}"
+            PREVIOUS="${{ steps.folders.outputs.previous }}"
+            git commit -m "chore(fmhy): monthly scrape $CURRENT
+
+          - Current snapshot  → fmhy/$CURRENT/
+          - Previous snapshot → fmhy/$PREVIOUS/ (retained as fallback)"
+            git push
+          fi
