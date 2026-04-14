@@ -1,0 +1,118 @@
+name: Update Typosquatting Blocklist
+
+on:
+  # Run on a schedule (every Sunday at 02:00 UTC)
+  schedule:
+    - cron: "0 2 * * 0"
+  # Allow manual runs from the Actions tab
+  workflow_dispatch:
+  # Run whenever the allowed-domains list changes
+  push:
+    paths:
+      - "allowed-domains.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  generate-blocklist:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Install URLCrazy ────────────────────────────────────────────────────
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: false
+
+      - name: Install URLCrazy
+        run: |
+          sudo apt-get install -y urlcrazy
+
+      # ── Generate variants ───────────────────────────────────────────────────
+      - name: Generate typo variants and filter
+        run: |
+          set -euo pipefail
+
+          ALLOWED_FILE="allowed-domains.txt"
+          BLOCKLIST_FILE="blocklist.txt"
+          SCRATCH=$(mktemp -d)
+          RAW="$SCRATCH/raw.txt"
+          RESOLVED="$SCRATCH/resolved.txt"
+
+          echo "==> Reading allowed domains from $ALLOWED_FILE"
+
+          # Strip comments and blank lines to build the allowed set
+          mapfile -t ALLOWED < <(grep -v '^\s*#' "$ALLOWED_FILE" | grep -v '^\s*$' | tr '[:upper:]' '[:lower:]')
+
+          if [ ${#ALLOWED[@]} -eq 0 ]; then
+            echo "No domains found in $ALLOWED_FILE — nothing to do."
+            exit 0
+          fi
+
+          echo "==> Running URLCrazy on ${#ALLOWED[@]} domain(s)..."
+
+          for domain in "${ALLOWED[@]}"; do
+            echo "  Processing: $domain"
+            # -f csv  → machine-readable output
+            # -r      → resolve DNS (only emit rows where A/MX records exist)
+            # Skip the header row; extract the Typo column (field 1)
+            urlcrazy -f csv "$domain" 2>/dev/null \
+              | tail -n +2 \
+              | cut -d',' -f1 \
+              | tr '[:upper:]' '[:lower:]' \
+              | grep -E '^[a-z0-9][a-z0-9\.\-]+\.[a-z]{2,}$' \
+              >> "$RAW" || true
+          done
+
+          echo "==> Raw variants generated: $(wc -l < "$RAW")"
+
+          # ── DNS filter: keep only variants that actually resolve ─────────────
+          echo "==> Checking DNS resolution..."
+          while IFS= read -r variant; do
+            # host exits 0 if the name resolves (A or MX)
+            if host -t A "$variant" >/dev/null 2>&1 || \
+               host -t MX "$variant" >/dev/null 2>&1; then
+              echo "$variant"
+            fi
+          done < "$RAW" > "$RESOLVED"
+
+          echo "==> Variants that resolve: $(wc -l < "$RESOLVED")"
+
+          # ── Allowed-list filter: remove any domain in the allowed list ───────
+          # Build a grep pattern from the allowed list
+          PATTERN=$(printf '%s\n' "${ALLOWED[@]}" | sed 's/\./\\./g' | paste -sd'|')
+
+          grep -Evx "($PATTERN)" "$RESOLVED" \
+            | sort -u \
+            > "$BLOCKLIST_FILE" || true
+
+          echo "==> Final blocklist size: $(wc -l < "$BLOCKLIST_FILE")"
+
+      # ── Commit result back to repo ──────────────────────────────────────────
+      - name: Commit updated blocklist
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add blocklist.txt
+
+          if git diff --cached --quiet; then
+            echo "No changes to blocklist — skipping commit."
+          else
+            TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
+            DOMAIN_COUNT=$(grep -v '^\s*#' allowed-domains.txt | grep -v '^\s*$' | wc -l)
+            BLOCK_COUNT=$(wc -l < blocklist.txt)
+
+            git commit -m "chore: update typosquatting blocklist [${TIMESTAMP}]
+
+- Source domains : ${DOMAIN_COUNT}
+- Blocked variants: ${BLOCK_COUNT}
+- Filters applied : DNS resolution, allowed-list exclusion"
+
+            git push
+          fi
