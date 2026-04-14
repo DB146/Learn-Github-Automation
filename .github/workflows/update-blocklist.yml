@@ -25,9 +25,9 @@ jobs:
       # ── Install URLCrazy ────────────────────────────────────────────────────
       - name: Install URLCrazy
         run: |
-          sudo apt-get install -y ruby ruby-dev build-essential
-          sudo gem install json colorize async async-dns async-http
+          sudo apt-get install -y ruby ruby-dev build-essential bundler
           git clone --depth 1 https://github.com/urbanadventurer/urlcrazy.git /opt/urlcrazy
+          cd /opt/urlcrazy && sudo bundle install
           sudo ln -s /opt/urlcrazy/urlcrazy /usr/local/bin/urlcrazy
 
       # ── Generate variants ───────────────────────────────────────────────────
@@ -53,16 +53,17 @@ jobs:
 
           echo "==> Running URLCrazy on ${#ALLOWED[@]} domain(s)..."
 
+          touch "$RAW"
           for domain in "${ALLOWED[@]}"; do
             echo "  Processing: $domain"
-            # -f csv  → machine-readable output
-            # -r      → resolve DNS (only emit rows where A/MX records exist)
-            # Skip the header row; extract the Typo column (field 1)
+            # -f csv  → machine-readable CSV output
+            # NOTE: -r means --no-resolve (skip DNS). We omit it here so URLCrazy
+            # generates ALL variants, then we do our own DNS check below.
             urlcrazy -f csv "$domain" 2>/dev/null \
               | tail -n +2 \
               | cut -d',' -f1 \
               | tr '[:upper:]' '[:lower:]' \
-              | grep -E '^[a-z0-9][a-z0-9\.\-]+\.[a-z]{2,}$' \
+              | grep -E '^[a-z0-9][a-z0-9.\-]+\.[a-z]{2,}$' \
               >> "$RAW" || true
           done
 
@@ -70,8 +71,8 @@ jobs:
 
           # ── DNS filter: keep only variants that actually resolve ─────────────
           echo "==> Checking DNS resolution..."
+          sudo apt-get install -y dnsutils -qq 2>/dev/null
           while IFS= read -r variant; do
-            # host exits 0 if the name resolves (A or MX)
             if host -t A "$variant" >/dev/null 2>&1 || \
                host -t MX "$variant" >/dev/null 2>&1; then
               echo "$variant"
@@ -81,7 +82,6 @@ jobs:
           echo "==> Variants that resolve: $(wc -l < "$RESOLVED")"
 
           # ── Allowed-list filter: remove any domain in the allowed list ───────
-          # Build a grep pattern from the allowed list
           PATTERN=$(printf '%s\n' "${ALLOWED[@]}" | sed 's/\./\\./g' | paste -sd'|')
 
           grep -Evx "($PATTERN)" "$RESOLVED" \
