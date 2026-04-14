@@ -23,15 +23,12 @@ jobs:
         uses: actions/checkout@v4
 
       # ── Install URLCrazy ────────────────────────────────────────────────────
-      - name: Install Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.2"
-          bundler-cache: false
-
       - name: Install URLCrazy
         run: |
-          sudo apt-get install -y urlcrazy
+          sudo apt-get install -y ruby ruby-dev build-essential
+          gem install json colorize async async-dns async-http
+          git clone --depth 1 https://github.com/urbanadventurer/urlcrazy.git /opt/urlcrazy
+          sudo ln -s /opt/urlcrazy/urlcrazy /usr/local/bin/urlcrazy
 
       # ── Generate variants ───────────────────────────────────────────────────
       - name: Generate typo variants and filter
@@ -108,10 +105,10 @@ jobs:
             DOMAIN_COUNT=$(grep -v '^\s*#' allowed-domains.txt | grep -v '^\s*$' | wc -l)
             BLOCK_COUNT=$(wc -l < blocklist.txt)
 
-            git commit -m "chore: update typosquatting blocklist [${TIMESTAMP}]
-            - Source domains : ${DOMAIN_COUNT}
-            - Blocked variants: ${BLOCK_COUNT}
-            - Filters applied : DNS resolution, allowed-list exclusion"
+            git commit -m "chore: update typosquatting blocklist [${TIMESTAMP}]" \
+              -m "Source domains: ${DOMAIN_COUNT}" \
+              -m "Blocked variants: ${BLOCK_COUNT}" \
+              -m "Filters applied: DNS resolution, allowed-list exclusion"
 
             git push
           fi
