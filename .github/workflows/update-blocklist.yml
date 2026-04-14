@@ -25,10 +25,37 @@ jobs:
       # ── Install URLCrazy ────────────────────────────────────────────────────
       - name: Install URLCrazy
         run: |
-          sudo apt-get install -y ruby ruby-dev build-essential bundler
+          sudo apt-get install -y ruby ruby-dev ruby-async ruby-async-http ruby-colorize dnsutils
           git clone --depth 1 https://github.com/urbanadventurer/urlcrazy.git /opt/urlcrazy
-          cd /opt/urlcrazy && sudo bundle install
-          sudo ln -s /opt/urlcrazy/urlcrazy /usr/local/bin/urlcrazy
+
+          # async-dns is not packaged in apt. URLCrazy already has a full Resolv
+          # fallback built in — patch it to skip the async/dns require and resolver.
+          python3 <<'PYEOF'
+          with open('/opt/urlcrazy/urlcrazy', 'r') as f:
+              src = f.read()
+          src = src.replace("  require 'async/dns'\n", "")
+          with open('/opt/urlcrazy/urlcrazy', 'w') as f:
+              f.write(src)
+
+          with open('/opt/urlcrazy/lib/typo.rb', 'r') as f:
+              src = f.read()
+          src = src.replace(
+              "@@resolver = Async::DNS::Resolver.new(ASYNC_DNS_SERVERS, timeout: 60)",
+              "@@resolver = nil # async-dns unavailable; Resolv fallback used instead"
+          )
+          with open('/opt/urlcrazy/lib/typo.rb', 'w') as f:
+              f.write(src)
+          print("URLCrazy patched OK")
+          PYEOF
+
+          # Wrapper script instead of symlink — urlcrazy uses relative requires
+          # so it must be executed from its own directory
+          sudo tee /usr/local/bin/urlcrazy > /dev/null <<'EOF'
+          #!/usr/bin/env bash
+          export RUBYOPT="-E UTF-8"
+          exec ruby /opt/urlcrazy/urlcrazy "$@"
+          EOF
+          sudo chmod +x /usr/local/bin/urlcrazy
 
       # ── Generate variants ───────────────────────────────────────────────────
       - name: Generate typo variants and filter
@@ -57,11 +84,14 @@ jobs:
           for domain in "${ALLOWED[@]}"; do
             echo "  Processing: $domain"
             # -f csv  → machine-readable CSV output
-            # NOTE: -r means --no-resolve (skip DNS). We omit it here so URLCrazy
-            # generates ALL variants, then we do our own DNS check below.
-            urlcrazy -f csv "$domain" 2>/dev/null \
-              | tail -n +2 \
-              | cut -d',' -f1 \
+            # Omit -r so ALL variants are generated (not just resolved ones)
+            # CSV format: "Typo Type","Typo","Valid","Pop","DNS-A",...
+            #   - row 1 is blank, row 2 is header → skip first 2 rows (tail -n +3)
+            #   - field 2 is the typo domain, values are quoted → strip with tr -d '"'
+            RUBYOPT="-E UTF-8" urlcrazy -f csv "$domain" 2>/dev/null \
+              | tail -n +3 \
+              | cut -d',' -f2 \
+              | tr -d '"' \
               | tr '[:upper:]' '[:lower:]' \
               | grep -E '^[a-z0-9][a-z0-9.\-]+\.[a-z]{2,}$' \
               >> "$RAW" || true
@@ -71,7 +101,6 @@ jobs:
 
           # ── DNS filter: keep only variants that actually resolve ─────────────
           echo "==> Checking DNS resolution..."
-          sudo apt-get install -y dnsutils -qq 2>/dev/null
           while IFS= read -r variant; do
             if host -t A "$variant" >/dev/null 2>&1 || \
                host -t MX "$variant" >/dev/null 2>&1; then
