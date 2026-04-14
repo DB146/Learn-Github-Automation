@@ -26,7 +26,7 @@ jobs:
       - name: Install URLCrazy
         run: |
           sudo apt-get install -y ruby ruby-dev build-essential
-          gem install json colorize async async-dns async-http
+          sudo gem install json colorize async async-dns async-http
           git clone --depth 1 https://github.com/urbanadventurer/urlcrazy.git /opt/urlcrazy
           sudo ln -s /opt/urlcrazy/urlcrazy /usr/local/bin/urlcrazy
 
