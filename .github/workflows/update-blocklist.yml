@@ -109,10 +109,9 @@ jobs:
             BLOCK_COUNT=$(wc -l < blocklist.txt)
 
             git commit -m "chore: update typosquatting blocklist [${TIMESTAMP}]
-
-- Source domains : ${DOMAIN_COUNT}
-- Blocked variants: ${BLOCK_COUNT}
-- Filters applied : DNS resolution, allowed-list exclusion"
+            - Source domains : ${DOMAIN_COUNT}
+            - Blocked variants: ${BLOCK_COUNT}
+            - Filters applied : DNS resolution, allowed-list exclusion"
 
             git push
           fi
