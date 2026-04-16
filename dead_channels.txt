@@ -1,4 +1,6 @@
  Nino Channel (server 1) | http://live.onnanetwork.xyz/hls/ninochannel/index.m3u8
+ ON Vie Giải Trí | https://freem3u.xyz/api/live/play.m3u8?vid=180
+ ON E- Channel | https://freem3u.xyz/api/live/play.m3u8?vid=182
  Huế TV - Báo và PTTH Huế | https://live.trt.com.vn/TRT-Online/chunklist.m3u8
  NHK World | https://live.fptplay53.net/fnxhd2/nhkworld_vhls.smil/chunklist_b5000000.m3u8 
  Đồng Tháp | https://64d0d74b76158.streamlock.net/THDTR/thdtradio/chunklist.m3u8
