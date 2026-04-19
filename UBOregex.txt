@@ -1,4 +1,4 @@
-! Title: Made-For-Advertisement Blocklist
+! Title: UBO Regex Blocklist
 ! Expires: 14 days (update frequency)
 ! Unsafe game sites
 ||*igg-games*^
