@@ -1,5 +1,5 @@
 @@||adguard-dns.io^
-!Obviously Bad
+!Bad App
 ||cnet.com^
 ||download.com^
 ||zdnet.de^
@@ -23,6 +23,16 @@
 ||kape.com^
 ||vpnmentor.com^
 ||wizcase.com^
+!Made-For-Advertisement
+||metaqore.net^
+||modabright.net^
+||thumpnews.com^
+||mobileera.net^
+||futurebyte.net^
+||tasteezy.net^
+||flavorvoyage.net^
+||phonevibe.net^
+||quantixa.net^
 !Regex
 ||*massgrave.*^$denyallow=massgrave.dev|massgrave.pages.dev|massgrave.visualstudio.com
 ||*massgrav.*^
