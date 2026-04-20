@@ -1,8 +1,45 @@
  Nino Channel (server 1) | http://live.onnanetwork.xyz/hls/ninochannel/index.m3u8
- ON Vie Giải Trí | https://freem3u.xyz/api/live/play.m3u8?vid=180
- ON E- Channel | https://freem3u.xyz/api/live/play.m3u8?vid=182
+Sky Sport F1 | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=122888&extension=ts&play_token=LB2IN39AIF
+Canal+ Sport | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1184930&extension=ts&play_token=fHBckk00nW
+ Canal+ Foot | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1071923&extension=ts&play_token=vcQAIeKouv
+ CANAL+ LIVE 1 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122056&extension=ts&play_token=223GgKAnFY
+ CANAL+ LIVE 2 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122022&extension=ts&play_token=iSj2dolRme
+ CANAL+ LIVE 3 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122024&extension=ts&play_token=CybqwfSLOa
+ CANAL+ LIVE 4 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122939&extension=ts&play_token=HIEGNfDnjh
+ CANAL+ LIVE 5 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122028&extension=ts&play_token=kFra0tQEzm
+ CANAL+ LIVE 6 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122030&extension=ts&play_token=JO8O3NwIu3
+ CANAL+ LIVE 7 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122032&extension=ts&play_token=v6BlP5EabS
+ CANAL+ LIVE 8 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122034&extension=ts&play_token=x6iYHVWSH9
+ CANAL+ LIVE 9 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122036&extension=ts&play_token=kuZ8wahbOG
+ CANAL+ LIVE 10 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122038&extension=ts&play_token=Pop6uUQR3I
+ CANAL+ LIVE 11 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122040&extension=ts&play_token=hTZeyPAfkN
+ CANAL+ LIVE 12 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122042&extension=ts&play_token=1MtcjI5wmF
+ CANAL+ LIVE 13 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122044&extension=ts&play_token=g168GcxJY4
+ CANAL+ LIVE 14 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122046&extension=ts&play_token=ehR6K7NzS8
+ CANAL+ LIVE 15 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122048&extension=ts&play_token=jR2N0mt5SZ
+ CANAL+ LIVE 16 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122050&extension=ts&play_token=pgbrtZxiUM
+ CANAL+ LIVE 17 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122052&extension=ts&play_token=o7h6R125hi
+ CANAL+ LIVE 18 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122054&extension=ts&play_token=XPmBZyeTRp
+ Polsat Sport 1 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=14740&extension=ts&play_token=jPBbeLu7rI
+ Polsat Sport 2 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=233715&extension=ts&play_token=klT8fyTCz5
+ Polsat Sport 3 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=233716&extension=ts&play_token=PSYS8qYMEV
+ Max Sport 1 HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=31801&extension=ts&play_token=MAaXIbHwPF
+ Max Sport 2 HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=31802&extension=ts&play_token=oKVP0gjuIKp
+ Max Sport 4 HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=31804&extension=ts&play_token=h5UuqXNs2K
+ Tyc Sport Argentina | http://myxpanel.pro:80/Martin/Martin/670987	
+ HTV3 - Đài PTTH Thành Phố Hồ Chí Minh | https://freem3u.xyz/api/live/play.m3u8?vid=192
  Huế TV - Báo và PTTH Huế | https://live.trt.com.vn/TRT-Online/chunklist.m3u8
+ HBO Hits | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776088&extension=ts&play_token=DDOOCF3plZ
+ HBO Family | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776089&extension=ts&play_token=xf9Vl3Lrhl
+ HBO Signature HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776085&extension=ts&play_token=aEwVlYvLMR
+ Animax | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1165775&extension=ts&play_token=yyA3sijrgj
+ BabyTV | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=150391&extension=ts&play_token=7pUsoprXJc
+ Love Nature | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1165908&extension=ts&play_token=jTMIxWqS7a
  NHK World | https://live.fptplay53.net/fnxhd2/nhkworld_vhls.smil/chunklist_b5000000.m3u8 
+Rock Entertainment | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776182&extension=ts&play_token=K4JiFEWv19
+Rock Action | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1165919&extension=ts&play_token=d5UxVs4YM2
+ Celestial Movies | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=1164000&extension=ts&play_token=HqvKowEeO4
+ Filmbox | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=88618&extension=ts&play_token=SmJehiM1EA
  Đồng Tháp | https://64d0d74b76158.streamlock.net/THDTR/thdtradio/chunklist.m3u8
  Khánh Hòa | http://210.245.20.94/hls/radio.m3u8
  Tây Ninh | http://202.43.109.142:1935/radio11/tnradio/chunklist.m3u8
@@ -32,4 +69,5 @@ h_550/cctv11_logo_by_amazingtoludada3000_dew5uz3-fullview.png?token=eyJ0eXAiOiJK
  CCTV17 | http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221225765/index.m3u8
  PPTV36 | https://cdn6.goprimetime.info/feed/eI5rczhSQpWBcgOtqRLNWw/chpptvhd3/index.m3u8
  MONO 29 | https://cdn6.goprimetime.info/feed/eI5rczhSQpWBcgOtqRLNWw/chmono293/index.m3u8
+ Thairath TV 32 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776225&extension=ts&play_token=TGCPfAlA9v
  Ramsey HangMeas Melody UHD | http://abclive.malisresidences.com:1935/hmmel/_definst_/smil:hmmel.smil/playlist.m3u8
