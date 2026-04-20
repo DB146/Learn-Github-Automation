@@ -38,6 +38,8 @@
 ||*massgrav.*^
 ||*massgraves.*^
 ||*microsoftactivationscripts.*^
+||*kmspico*.*^$denyallow=~forums.mydigitallife.net
+||*kms-pico*.*^
 ||*kmsauto.*^
 ||*kms-auto.*^
 ||*kmsmatrix.^
