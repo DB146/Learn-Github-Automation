@@ -34,7 +34,7 @@
 ||phonevibe.net^
 ||quantixa.net^
 !Regex
-/(^|\.)xn--/
+||/xn--/^
 ||*massgrave.*^$denyallow=massgrave.dev|massgrave.pages.dev|massgrave.visualstudio.com
 ||*massgrav.*^
 ||*massgraves.*^
