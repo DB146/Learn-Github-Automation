@@ -1,5 +1,4 @@
  Nino Channel (server 1) | http://live.onnanetwork.xyz/hls/ninochannel/index.m3u8
-Sky Sport F1 | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=122888&extension=ts&play_token=LB2IN39AIF
 Canal+ Sport | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1184930&extension=ts&play_token=fHBckk00nW
  Canal+ Foot | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1071923&extension=ts&play_token=vcQAIeKouv
  CANAL+ LIVE 1 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122056&extension=ts&play_token=223GgKAnFY
@@ -27,11 +26,7 @@ Canal+ Sport | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&strea
  Max Sport 2 HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=31802&extension=ts&play_token=oKVP0gjuIKp
  Max Sport 4 HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=31804&extension=ts&play_token=h5UuqXNs2K
  Tyc Sport Argentina | http://myxpanel.pro:80/Martin/Martin/670987	
- HTV3 - Đài PTTH Thành Phố Hồ Chí Minh | https://freem3u.xyz/api/live/play.m3u8?vid=192
  Huế TV - Báo và PTTH Huế | https://live.trt.com.vn/TRT-Online/chunklist.m3u8
- HBO Hits | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776088&extension=ts&play_token=DDOOCF3plZ
- HBO Family | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776089&extension=ts&play_token=xf9Vl3Lrhl
- HBO Signature HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776085&extension=ts&play_token=aEwVlYvLMR
  Animax | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1165775&extension=ts&play_token=yyA3sijrgj
  BabyTV | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=150391&extension=ts&play_token=7pUsoprXJc
  Love Nature | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1165908&extension=ts&play_token=jTMIxWqS7a
