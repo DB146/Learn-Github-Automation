@@ -1,2 +1,0 @@
-truyenqqno.com##+js(trusted-set-cookie, setting_dark_mode, dark, 1year)
-docln.net##+js(trusted-set-cookie, night_mode, true, 1year)
