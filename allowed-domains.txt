@@ -1,8 +1,0 @@
-# List of legitimate domains that should never be blocked
-# One domain per line. Lines starting with # are ignored.
-google.com
-github.com
-microsoft.com
-youtube.com
-facebook.com
-reddit.com
