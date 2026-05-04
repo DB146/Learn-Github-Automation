@@ -1,5 +1,3 @@
- Canal+ Foot | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1071923&extension=ts&play_token=vcQAIeKouv
- CANAL+ LIVE 1 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122056&extension=ts&play_token=223GgKAnFY
  CANAL+ LIVE 2 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122022&extension=ts&play_token=iSj2dolRme
  CANAL+ LIVE 3 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122024&extension=ts&play_token=CybqwfSLOa
  CANAL+ LIVE 4 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122939&extension=ts&play_token=HIEGNfDnjh
@@ -24,17 +22,9 @@
  Max Sport 2 HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=31802&extension=ts&play_token=oKVP0gjuIKp
  Max Sport 4 HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=31804&extension=ts&play_token=h5UuqXNs2K
  Tyc Sport Argentina | http://myxpanel.pro:80/Martin/Martin/670987	
- ON Vie Giải Trí | https://freem3u.xyz/api/live/play.m3u8?vid=180
- On Music | https://freem3u.xyz/api/live/play.m3u8?vid=185
- ON Vie Dramas | https://freem3u.xyz/api/live/play.m3u8?vid=177
- On Life | https://freem3u.xyz/api/live/play.m3u8?vid=188
- HTV1 - Đài PTTH Thành Phố Hồ Chí Minh | https://freem3u.xyz/api/live/play.m3u8?vid=190
  HTV7 - Đài PTTH Thành Phố Hồ Chí Minh | https://vc.101vn.com/htv/htvcmb.php?id=256
  Huế TV - Báo và PTTH Huế | https://live.trt.com.vn/TRT-Online/chunklist.m3u8
- LTV1 HD - Báo và PTTH Lâm Đồng | https://freem3u.xyz/api/live/play.m3u8?vid=69
  NHK World | https://live.fptplay53.net/fnxhd2/nhkworld_vhls.smil/chunklist_b5000000.m3u8 
-Rock Entertainment | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776182&extension=ts&play_token=K4JiFEWv19
-Rock Action | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1165919&extension=ts&play_token=d5UxVs4YM2
  Celestial Movies | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=1164000&extension=ts&play_token=HqvKowEeO4
  Filmbox | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=88618&extension=ts&play_token=SmJehiM1EA
  Đồng Tháp | https://64d0d74b76158.streamlock.net/THDTR/thdtradio/chunklist.m3u8
