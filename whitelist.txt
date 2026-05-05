@@ -1,0 +1,95 @@
+# =============================================================================
+# whitelist.txt – Official / Legitimate Domains
+# Vietnamese Domain Typosquatting Monitor
+# Last updated: 2025
+# =============================================================================
+# Format: one domain per line (scheme-free, no trailing slash)
+# Lines starting with # are ignored.
+# =============================================================================
+
+# ─── VIETTEL GROUP ───────────────────────────────────────────────────────────
+viettel.vn
+viettel.com.vn
+viettelstore.vn
+viettelpost.vn
+viettelnet.vn
+viettelplay.vn
+viettelidc.com.vn
+mytel.com.mm
+
+# ─── FPT CORPORATION ─────────────────────────────────────────────────────────
+fpt.com.vn
+fpt.vn
+fptshop.com.vn
+fpttelecom.com.vn
+fptplay.vn
+fptcloud.com
+fptsmarthome.vn
+fptuniversity.edu.vn
+fsoft.com.vn
+
+# ─── VINGROUP (& SUBSIDIARIES) ───────────────────────────────────────────────
+vingroup.net
+vinfast.vn
+vinhomes.vn
+vincom.com.vn
+vinmec.com
+vinschool.edu.vn
+vinpearl.com
+vinsmart.net
+vinfocus.vn
+vinbus.vn
+vinhomes.com.vn
+
+# ─── MOBILE WORLD GROUP (MWG) ────────────────────────────────────────────────
+thegioididong.com
+dienmayxanh.com
+bachhoaxanh.com
+topzone.vn
+
+# ─── VINAMILK ────────────────────────────────────────────────────────────────
+vinamilk.com.vn
+vinamilk.vn
+
+# ─── MASAN GROUP ─────────────────────────────────────────────────────────────
+masan.com.vn
+masanconsumer.com
+wincommerce.vn
+techcombank.com.vn
+
+# ─── BANKING ─────────────────────────────────────────────────────────────────
+vietcombank.com.vn
+techcombank.com.vn
+vpbank.com.vn
+acb.com.vn
+mbbank.com.vn
+bidv.com.vn
+agribank.com.vn
+vib.com.vn
+hdbank.com.vn
+sacombank.com
+tpbank.vn
+msb.com.vn
+
+# ─── GHN / GHTK (Logistics) ──────────────────────────────────────────────────
+ghn.vn
+giaohangnhanh.vn
+ghtk.vn
+giaohangtietkiem.vn
+
+# ─── VNPT / VINAPHONE ────────────────────────────────────────────────────────
+vnpt.vn
+vinaphone.com.vn
+vnpttechnology.vn
+vnpt-i.vn
+
+# ─── TIKI / SENDO / LAZADA (E-commerce) ──────────────────────────────────────
+tiki.vn
+sendo.vn
+lazada.vn
+shopee.vn
+
+# ─── MISC OFFICIAL ───────────────────────────────────────────────────────────
+sunworld.vn
+phuclong.com.vn
+highlands.com.vn
