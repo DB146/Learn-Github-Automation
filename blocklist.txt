@@ -1,0 +1,91 @@
+# --- COMMON SEO/MARKETING KEYWORD PATTERNS (Generic) ---
+# These are often used as [brand][keyword].vn or [brand]-[keyword].com
+# Patterns: -khuyenmai, -store, -online, -uudai, -dangky, -vnn, -vn
+
+# --- VIETTEL SEO & FAKE DOMAINS ---
+viettel-store.com
+viettel-haiphong.com.vn
+viettel-hanoi.vn
+dangkyviettel.vn
+goicuocviettel.vn
+khuyenmaiviettel.vn
+tongdaiviettel.vn
+viettelnet.vn
+viettel4g.net
+viettelservice.com
+sim4gviettel.com.vn
+
+# --- FPT SEO & MARKETING DOMAINS ---
+fpt-telecom.com
+fpt-hanoi.vn
+fptvinhomes.vn
+lapmangfpt.vn
+fptinternet.net
+fpt-khuyenmai.com
+tongdaifpt.vn
+fptonline.info
+fptgoicuoc.vn
+fptshop-khuyenmai.com
+
+# --- VINGROUP / VINFAST / VINHOMES (Known Fake/SEO) ---
+vingroup.ink
+vingroupp.net
+vingroupvnn.com
+vingroup.store
+api.vingroup.store
+vingroupventures.top
+vingroupventures.site
+vingroupventures.vip
+vingroupglobal.com
+vingroupinternational.vn
+vincomttvip.net
+vincomccvip.net
+vincomhhvip.net
+vincomaavip.net
+tramsacpinvinfasttoanquoc.com
+vinhomes-khuyenmai.com
+vinfast-online.vn
+
+# --- MOBILE WORLD / DIEN MAY XANH (Reported Fake) ---
+dienmayxanhh.com
+shrimpskins.org
+thegioididong-khuyenmai.com
+tgdd-online.net
+thegioididong.vip
+dienmayxanh.vip
+tgdd.store
+
+# --- BANKING & FINTECH (Phishing/Fake) ---
+sotuyenvcb.vietcombanker.com
+vietcombank-online.info
+vdbank.com.vn
+nganhangsaison.org
+sunmomo.me
+trumcltx.vip
+goplay88.me
+vcbdlgrcbonk.com
+v-pbank.com
+acb-online.vip
+
+# --- VNPT / VINAPHONE SEO ---
+vnpt-hanoi.com.vn
+vnpt-hochiminh.vn
+lapmangvnpt.vn
+tongdaivnpt.vn
+vinaphone-khuyenmai.com
+dangky3gvinaphone.vn
+
+# --- RECRUITMENT/SCAM SEO ---
+tuyendung-vingroup.com
+tuyendung-fpt.net
+vieclam-masan.com
+vieclam-tgdd.vn
+shopee-tuyendung.com
+lazada-career.co
+
+# --- MISC LIKELY-SEO/UNOFFICIAL ---
+tiki-khuyenmai.vn
+sendo-sale.com
+phuclong-tea.info
+vinamilk-shop.net
+sunworld-tickets.com
