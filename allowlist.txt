@@ -1,0 +1,108 @@
+# --- VIETTEL GROUP (Telecom & Tech) ---
+viettel.vn
+viettel.com.vn
+vietteltelecom.vn
+viettelstore.vn
+viettelpost.com.vn
+viettelmoney.vn
+tv360.vn
+imuzik.com.vn
+keeng.vn
+viettelsolutions.vn
+viettel-idc.com.vn
+
+# --- VINGROUP (Multi-industry) ---
+vingroup.net
+vinfastauto.com
+vinfast.vn
+vinhomes.vn
+vincom.com.vn
+vinpearl.com
+vinwonders.com
+vinmec.com
+vinschool.edu.vn
+vinuni.edu.vn
+
+# --- FPT CORPORATION (Tech & Retail) ---
+fpt.com.vn
+fpt.com
+fpt.vn
+fptplay.vn
+fptshop.com.vn
+fpt.edu.vn
+fptsoftware.com
+fpt-is.com
+longchau.com
+nhathuoclongchau.com.vn
+
+# --- MOBILE WORLD GROUP / MWG (Retail) ---
+mwg.vn
+thegioididong.com
+dienmayxanh.com
+bachhoaxanh.com
+nhathuocankhang.com
+avakids.com
+topzone.vn
+
+# --- VNPT / VINAPHONE (Telecom) ---
+vnpt.vn
+vnpt.com.vn
+vinaphone.com.vn
+vnptit.vn
+vnptweb.vn
+vnedu.vn
+
+# --- MASAN GROUP (Consumer Goods & Retail) ---
+masangroup.com
+masanconsumer.com
+winmart.vn
+phuclong.com.vn
+meatdeli.com.vn
+
+# --- NOVAGROUP (Real Estate & Services) ---
+novagroup.vn
+novaland.com.vn
+novaservice.com.vn
+novaconsumer.com.vn
+novaworldphanthiet.com.vn
+
+# --- SUN GROUP (Tourism & Luxury) ---
+sungroup.com.vn
+sunworld.vn
+banahills.sunworld.vn
+fansipanlegend.sunworld.vn
+
+# --- VINAMILK (Dairy) ---
+vinamilk.com.vn
+giadinhvinamilk.com.vn
+
+# --- BANKING & FINANCE (Major Local) ---
+vietcombank.com.vn
+techcombank.com
+bidv.com.vn
+vietinbank.vn
+vpb.com.vn
+sacombank.com.vn
+mbbank.com.vn
+tpbank.vn
+
+# --- TRAVEL & AVIATION ---
+vietnamairlines.com
+vietjetair.com
+bambooairways.com
+vietravel.com
+saigontourist.net
+
+# --- FUEL & ENERGY ---
+petrolimex.com.vn
+pvoil.com.vn
+pvpower.vn
+
+# --- BEVERAGES ---
+sabeco.com.vn
+habeco.com.vn
+thmilk.vn
+
+# --- E-COMMERCE (Local Giants) ---
+tiki.vn
+sendo.vn
