@@ -18,7 +18,58 @@ import sys
 import json
 from pathlib import Path
 from typing import Optional
+import concurrent.futures
 
+# Add near the top of monitor.py
+MAX_CANDIDATES_PER_BRAND = 500   # hard cap per brand
+DNS_WORKERS = 20                  # concurrent DNS threads
+DNS_TIMEOUT = 2.0                 # seconds per lookup (was 3.0)
+
+def check_domain(domain: str, whitelist: set, blacklist: set):
+    """Worker function for thread pool."""
+    base = extract_base(domain)
+    if base in whitelist or domain.lower() in whitelist:
+        return None
+    if base in blacklist or domain.lower() in blacklist:
+        return None
+    ip = resolve_a_record(domain, timeout=DNS_TIMEOUT)
+    return domain.lower() if ip else None
+
+def scan_brand(brand, whitelist, existing_blacklist):
+    logger.info("Scanning brand: %s", brand.upper())
+
+    candidates = build_full_domain_list(brand)
+
+    # Hard cap to avoid timeout
+    if len(candidates) > MAX_CANDIDATES_PER_BRAND:
+        logger.warning("  Capping %d candidates to %d", len(candidates), MAX_CANDIDATES_PER_BRAND)
+        candidates = candidates[:MAX_CANDIDATES_PER_BRAND]
+
+    logger.info("  Checking %d domain candidates (threaded)", len(candidates))
+
+    new_finds = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=DNS_WORKERS) as executor:
+        futures = {
+            executor.submit(check_domain, d, whitelist, existing_blacklist): d
+            for d in candidates
+        }
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result:
+                logger.warning("  [HIT] %s", result)
+                new_finds.append(result)
+
+    # dnstwist pass (keep but limit TLDs)
+    for tld in [".vn", ".com"]:   # reduced from 3 TLDs to 2
+        dnstwist_hits = run_dnstwist(brand, tld)
+        for domain in dnstwist_hits:
+            base = extract_base(domain)
+            if base not in whitelist and base not in existing_blacklist \
+                    and domain not in new_finds:
+                new_finds.append(domain.lower())
+
+    logger.info("  Brand %s: %d new domain(s) found.", brand, len(new_finds))
+    return new_finds
 # ---------------------------------------------------------------------------
 # Optional / graceful imports
 # ---------------------------------------------------------------------------
