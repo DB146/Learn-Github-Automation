@@ -130,6 +130,7 @@ jobs:
               body: body,
               labels: ['security', 'typosquatting', 'automated'],
             });
+
       - name: Warn if too many domains to open issue
         if: |
             steps.monitor.outputs.new_count != '' &&
