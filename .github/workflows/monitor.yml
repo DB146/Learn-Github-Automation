@@ -1,0 +1,155 @@
+# .github/workflows/monitor.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Vietnamese Domain Typosquatting Monitor
+# Runs every 24 hours (and on every push to main for quick testing).
+# If new fake domains are found, commits blacklist.txt back to the repo.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Domain Typosquatting Monitor
+
+on:
+  schedule:
+    # Runs at 02:00 UTC daily (09:00 ICT = Indochina Time)
+    - cron: "0 2 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:   # Allow manual triggers from the GitHub UI
+
+permissions:
+  contents: write      # Required to push blacklist.txt changes
+
+jobs:
+  scan:
+    name: Scan for Fake / Typosquatted Domains
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # Full history so we can commit & push cleanly
+
+      # ── 2. Python setup ──────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 3. Install system deps (dnstwist needs libicu) ───────────────────
+      - name: Install system libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libicu-dev \
+            libssl-dev \
+            whois
+
+      # ── 4. Install Python dependencies ───────────────────────────────────
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            dnspython \
+            dnstwist[full] \
+            tldextract \
+            requests
+
+      # ── 5. Run the monitor ───────────────────────────────────────────────
+      - name: Run domain monitor
+        id: monitor
+        run: |
+          python monitor.py
+          # Export the new-domain count for use in later steps
+          if [ -f scan_summary.json ]; then
+            COUNT=$(python -c "import json; d=json.load(open('scan_summary.json')); print(d['new_domains'])")
+            echo "new_count=$COUNT" >> "$GITHUB_OUTPUT"
+          else
+            echo "new_count=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 6. Upload artefacts (always, even on failure) ────────────────────
+      - name: Upload scan artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-results-${{ github.run_id }}
+          path: |
+            blacklist.txt
+            scan_summary.json
+            monitor.log
+          retention-days: 30
+
+      # ── 7. Commit & push if new domains were found ───────────────────────
+      - name: Commit updated blacklist
+        if: steps.monitor.outputs.new_count != '0'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add blacklist.txt scan_summary.json
+
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          COUNT=${{ steps.monitor.outputs.new_count }}
+          git commit -m "chore(monitor): add ${COUNT} new suspicious domain(s) [${TIMESTAMP}]"
+
+          # Push with retry logic to handle transient network failures
+          for i in 1 2 3; do
+            git push && break
+            echo "Push attempt $i failed, retrying in 10s…"
+            sleep 10
+          done
+
+      # ── 8. Create a GitHub Issue if new threats found ────────────────────
+      - name: Open GitHub Issue for new threats
+        if: steps.monitor.outputs.new_count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = JSON.parse(fs.readFileSync('scan_summary.json', 'utf8'));
+            const domainList = summary.domains.map(d => `- \`${d}\``).join('\n');
+            const body = [
+              `## 🚨 New Suspicious Domains Detected`,
+              `**Scan time:** ${summary.timestamp}`,
+              `**Total new domains:** ${summary.new_domains}`,
+              ``,
+              `### Domains`,
+              domainList,
+              ``,
+              `> This issue was automatically created by the Domain Monitor workflow.`,
+              `> Review each domain, validate manually, and close this issue when resolved.`,
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Domain Monitor] ${summary.new_domains} new suspicious domain(s) – ${summary.timestamp}`,
+              body: body,
+              labels: ['security', 'typosquatting', 'automated'],
+            });
+
+      # ── 9. Summary ───────────────────────────────────────────────────────
+      - name: Print scan summary
+        if: always()
+        run: |
+          echo "## Domain Monitor Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f scan_summary.json ]; then
+            COUNT=$(python -c "import json; d=json.load(open('scan_summary.json')); print(d['new_domains'])")
+            echo "**New suspicious domains found:** ${COUNT}" >> $GITHUB_STEP_SUMMARY
+            if [ "$COUNT" -gt "0" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### New domains" >> $GITHUB_STEP_SUMMARY
+              python -c "
+          import json
+          d = json.load(open('scan_summary.json'))
+          for dom in d['domains']:
+              print(f'- \`{dom}\`')
+          " >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "**No new suspicious domains found.**" >> $GITHUB_STEP_SUMMARY
+          fi
