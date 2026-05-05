@@ -22,7 +22,7 @@ jobs:
   scan:
     name: Scan for Fake / Typosquatted Domains
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 55
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────
@@ -56,6 +56,7 @@ jobs:
       # ── 5. Run the monitor ───────────────────────────────────────────────
       - name: Run domain monitor
         id: monitor
+        timeout-minutes: 45            # leaves 10 min for commit/push/issue steps
         run: |
           python monitor.py
           # Export the new-domain count for use in later steps
@@ -100,7 +101,10 @@ jobs:
 
       # ── 8. Create a GitHub Issue if new threats found ────────────────────
       - name: Open GitHub Issue for new threats
-        if: steps.monitor.outputs.new_count != '0'
+        if: |
+          steps.monitor.outputs.new_count != '0' &&
+          steps.monitor.outputs.new_count != '' &&
+          fromJSON(steps.monitor.outputs.new_count) <= 50
         uses: actions/github-script@v7
         with:
           script: |
@@ -126,6 +130,15 @@ jobs:
               body: body,
               labels: ['security', 'typosquatting', 'automated'],
             });
+      - name: Warn if too many domains to open issue
+        if: |
+            steps.monitor.outputs.new_count != '' &&
+            fromJSON(steps.monitor.outputs.new_count) > 50
+          run: |
+            COUNT=${{ steps.monitor.outputs.new_count }}
+            echo "::warning::Scan found ${COUNT} domains — too many to open an issue (threshold: 50). Review blacklist.txt artifact manually."
+            echo "## ⚠️ Too many domains for auto-issue" >> $GITHUB_STEP_SUMMARY
+            echo "Found **${COUNT}** new domains. Threshold is 50. Download the \`scan-results\` artifact to review." >> $GITHUB_STEP_SUMMARY
 
       # ── 9. Summary ───────────────────────────────────────────────────────
       - name: Print scan summary
