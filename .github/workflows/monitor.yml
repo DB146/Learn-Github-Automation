@@ -51,11 +51,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install \
-            dnspython \
-            dnstwist[full] \
-            tldextract \
-            requests
+          pip install -r requirements.txt
 
       # ── 5. Run the monitor ───────────────────────────────────────────────
       - name: Run domain monitor
