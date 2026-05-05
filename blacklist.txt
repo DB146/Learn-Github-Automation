@@ -1,5 +1,15 @@
+# =============================================================================
+# blacklist.txt – Confirmed Suspicious / Fake / Typosquatted Domains
+# Vietnamese Domain Typosquatting Monitor
+# =============================================================================
+# This file is append-only. New entries are added automatically by monitor.py.
+# Manual entries are seeded below based on known-bad domains at project start.
+# Format: one domain per line; comment lines start with #
+# =============================================================================
+
+# --- Seed: manually verified known-bad domains (project start) ---
+
 # --- COMMON SEO/MARKETING KEYWORD PATTERNS (Generic) ---
-# These are often used as [brand][keyword].vn or [brand]-[keyword].com
 # Patterns: -khuyenmai, -store, -online, -uudai, -dangky, -vnn, -vn
 
 # --- VIETTEL SEO & FAKE DOMAINS ---
