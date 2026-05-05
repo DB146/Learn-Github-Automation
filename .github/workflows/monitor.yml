@@ -122,7 +122,7 @@ jobs:
               `> This issue was automatically created by the Domain Monitor workflow.`,
               `> Review each domain, validate manually, and close this issue when resolved.`,
             ].join('\n');
-
+           
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -130,16 +130,16 @@ jobs:
               body: body,
               labels: ['security', 'typosquatting', 'automated'],
             });
-
+              
       - name: Warn if too many domains to open issue
         if: |
-            steps.monitor.outputs.new_count != '' &&
-            fromJSON(steps.monitor.outputs.new_count) > 50
-          run: |
-            COUNT=${{ steps.monitor.outputs.new_count }}
-            echo "::warning::Scan found ${COUNT} domains — too many to open an issue (threshold: 50). Review blacklist.txt artifact manually."
-            echo "## ⚠️ Too many domains for auto-issue" >> $GITHUB_STEP_SUMMARY
-            echo "Found **${COUNT}** new domains. Threshold is 50. Download the \`scan-results\` artifact to review." >> $GITHUB_STEP_SUMMARY
+              steps.monitor.outputs.new_count != '' &&
+              fromJSON(steps.monitor.outputs.new_count) > 50
+        run: |
+              COUNT=${{ steps.monitor.outputs.new_count }}
+              echo "::warning::Scan found ${COUNT} domains — too many to open an issue (threshold: 50). Review blacklist.txt artifact manually."
+              echo "## ⚠️ Too many domains for auto-issue" >> $GITHUB_STEP_SUMMARY
+              echo "Found **${COUNT}** new domains. Threshold is 50. Download the \`scan-results\` artifact to review." >> $GITHUB_STEP_SUMMARY
 
       # ── 9. Summary ───────────────────────────────────────────────────────
       - name: Print scan summary
