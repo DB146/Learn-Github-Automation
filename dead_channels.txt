@@ -1,6 +1,3 @@
- CANAL+ LIVE 2 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122022&extension=ts&play_token=iSj2dolRme
- CANAL+ LIVE 3 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122024&extension=ts&play_token=CybqwfSLOa
- CANAL+ LIVE 4 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122939&extension=ts&play_token=HIEGNfDnjh
  CANAL+ LIVE 5 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122028&extension=ts&play_token=kFra0tQEzm
  CANAL+ LIVE 6 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122030&extension=ts&play_token=JO8O3NwIu3
  CANAL+ LIVE 7 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122032&extension=ts&play_token=v6BlP5EabS
@@ -22,11 +19,15 @@
  Max Sport 2 HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=31802&extension=ts&play_token=oKVP0gjuIKp
  Max Sport 4 HD | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=31804&extension=ts&play_token=h5UuqXNs2K
  Tyc Sport Argentina | http://myxpanel.pro:80/Martin/Martin/670987	
+ Sự Kiện VTVPrime 11 | https://liveh34byt.vtvprime.vn/hls/SKSS1/04.m3u8
+ Sự Kiện VTVPrime 12 | https://liveh34byt.vtvprime.vn/hls/SKSS2/04.m3u8
+ Sự Kiện VTVPrime 13 | https://liveh34byt.vtvprime.vn/hls/SKSS3/04.m3u8
+ Sự Kiện VTVPrime 14 | https://liveh34byt.vtvprime.vn/hls/SKSS4/04.m3u8
+ Sự Kiện VTVPrime 15 | https://liveh34byt.vtvprime.vn/hls/SKSS5/04.m3u8
+ Sự Kiện VTVPrime 16 | https://liveh34byt.vtvprime.vn/hls/SKSS6/04.m3u8
  HTV7 - Đài PTTH Thành Phố Hồ Chí Minh | https://vc.101vn.com/htv/htvcmb.php?id=256
  Huế TV - Báo và PTTH Huế | https://live.trt.com.vn/TRT-Online/chunklist.m3u8
  NHK World | https://live.fptplay53.net/fnxhd2/nhkworld_vhls.smil/chunklist_b5000000.m3u8 
- Celestial Movies | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=1164000&extension=ts&play_token=HqvKowEeO4
- Filmbox | http://ch-4k-top.org/play/live.php?mac=00:1A:79:7a:39:a6&stream=88618&extension=ts&play_token=SmJehiM1EA
  Đồng Tháp | https://64d0d74b76158.streamlock.net/THDTR/thdtradio/chunklist.m3u8
  Khánh Hòa | http://210.245.20.94/hls/radio.m3u8
  Tây Ninh | http://202.43.109.142:1935/radio11/tnradio/chunklist.m3u8
