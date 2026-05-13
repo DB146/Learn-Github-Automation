@@ -1,95 +1,354 @@
 # =============================================================================
-# whitelist.txt – Official / Legitimate Domains
-# Vietnamese Domain Typosquatting Monitor
-# Last updated: 2025
+# Vietnamese Domain Typosquatting Monitor — Official Whitelist
 # =============================================================================
-# Format: one domain per line (scheme-free, no trailing slash)
-# Lines starting with # are ignored.
+# Purpose : Domains listed here are NEVER flagged as suspicious.
+#           Add any verified, legitimate domain to this file.
+# Format  : One domain per line. Lines starting with # are comments.
+#           All entries are case-insensitive (lowercased at load time).
+# Updated : 2025-07-01
 # =============================================================================
 
-# ─── VIETTEL GROUP ───────────────────────────────────────────────────────────
+
+# -----------------------------------------------------------------------------
+# VIETTEL GROUP
+# Largest Vietnamese telco — military-owned, operates mobile / ISP / cloud
+# -----------------------------------------------------------------------------
 viettel.vn
 viettel.com.vn
 viettelstore.vn
+vietteltelecom.vn
 viettelpost.vn
+viettelpost.com.vn
+viettelpay.vn
+viettelmoney.vn
+viettelcloud.vn
 viettelnet.vn
-viettelplay.vn
-viettelidc.com.vn
-mytel.com.mm
+viettel.com
+viettel.global
+viettel.com.kh         # Cambodia subsidiary
+viettel.com.la         # Laos subsidiary (Unitel)
+viettel.com.mm         # Myanmar subsidiary (Mytel)
 
-# ─── FPT CORPORATION ─────────────────────────────────────────────────────────
+
+# -----------------------------------------------------------------------------
+# FPT CORPORATION
+# Major tech / telecom / education conglomerate
+# -----------------------------------------------------------------------------
 fpt.com.vn
 fpt.vn
+fpt.com
 fptshop.com.vn
+fptsoftware.com
+fptsoftware.com.vn
 fpttelecom.com.vn
 fptplay.vn
-fptcloud.com
-fptsmarthome.vn
 fptuniversity.edu.vn
-fsoft.com.vn
+fptschool.edu.vn
+fai.fpt.vn             # FPT AI subsidiary
+fpt-is.com             # FPT Information System
+fptsmarthome.vn
+fptcloud.com
+fptcloud.com.vn
 
-# ─── VINGROUP (& SUBSIDIARIES) ───────────────────────────────────────────────
+
+# -----------------------------------------------------------------------------
+# VINGROUP ECOSYSTEM
+# Vietnam's largest private conglomerate (real estate, auto, retail, health)
+# -----------------------------------------------------------------------------
+# Holding
 vingroup.net
+vingroup.com.vn
+
+# Automotive
 vinfast.vn
+vinfast.com
+vinfast.us
+vinfast.ca
+vinfast.fr
+vinfast.de
+vinfast.com.au
+vinfast.nl
+vinfasttaxi.vn
+
+# Real estate
 vinhomes.vn
-vincom.com.vn
-vinmec.com
-vinschool.edu.vn
-vinpearl.com
-vinsmart.net
-vinfocus.vn
-vinbus.vn
 vinhomes.com.vn
+vincity.vn
+vinpearl.com
+vinpearl.com.vn
 
-# ─── MOBILE WORLD GROUP (MWG) ────────────────────────────────────────────────
+# Retail / commerce
+vincom.com.vn
+vinmart.vn
+vinmart.com.vn
+
+# Healthcare
+vinmec.com
+vinmec.com.vn
+
+# Education
+vinschool.edu.vn
+vinuni.edu.vn          # VinUniversity
+
+# Technology / R&D
+vinsmart.net
+vinsmart.com.vn
+vinai.io               # VinAI Research
+
+
+# -----------------------------------------------------------------------------
+# MOBILE WORLD GROUP (Thế Giới Di Động)
+# Largest consumer-electronics & grocery retailer in Vietnam
+# -----------------------------------------------------------------------------
 thegioididong.com
+thegioididong.com.vn
 dienmayxanh.com
+dienmayxanh.com.vn
 bachhoaxanh.com
-topzone.vn
+bachhoaxanh.com.vn
+avakids.com
+avakids.com.vn
+tgdd.vn                # common brand abbreviation (official)
 
-# ─── VINAMILK ────────────────────────────────────────────────────────────────
-vinamilk.com.vn
-vinamilk.vn
 
-# ─── MASAN GROUP ─────────────────────────────────────────────────────────────
-masan.com.vn
-masanconsumer.com
-wincommerce.vn
-techcombank.com.vn
-
-# ─── BANKING ─────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# BANKING — STATE-OWNED & JOINT-STOCK BANKS
+# -----------------------------------------------------------------------------
+# Vietcombank (Bank for Foreign Trade of Vietnam)
 vietcombank.com.vn
-techcombank.com.vn
-vpbank.com.vn
-acb.com.vn
-mbbank.com.vn
+vcb.com.vn
+vietcombankpremier.com.vn
+
+# VietinBank
+vietinbank.vn
+vietinbank.com.vn
+
+# BIDV
 bidv.com.vn
+
+# Agribank
 agribank.com.vn
-vib.com.vn
+
+# Techcombank
+techcombank.com.vn
+techcombank.vn
+
+# VPBank
+vpbank.com.vn
+vpbank.vn
+
+# ACB (Asia Commercial Bank)
+acb.com.vn
+acb.vn
+
+# MBBank (Military Commercial Bank)
+mbbank.com.vn
+mbbank.vn
+mb.com.vn
+
+# Sacombank
+sacombank.com.vn
+sacombank.vn
+
+# HDBank
 hdbank.com.vn
-sacombank.com
+
+# TPBank
 tpbank.vn
+tpbank.com.vn
+
+# VIB
+vib.com.vn
+
+# SHB
+shb.com.vn
+
+# OCB
+ocb.com.vn
+
+# MSB (Maritime Bank)
 msb.com.vn
 
-# ─── GHN / GHTK (Logistics) ──────────────────────────────────────────────────
-ghn.vn
-giaohangnhanh.vn
-ghtk.vn
-giaohangtietkiem.vn
+# SeABank
+seabank.com.vn
 
-# ─── VNPT / VINAPHONE ────────────────────────────────────────────────────────
-vnpt.vn
-vinaphone.com.vn
-vnpttechnology.vn
-vnpt-i.vn
+# Bac A Bank
+baca-bank.vn
 
-# ─── TIKI / SENDO / LAZADA (E-commerce) ──────────────────────────────────────
+# Dong A Bank
+dongabank.com.vn
+
+# LienViet PostBank
+lienvietpostbank.com.vn
+
+# National Citizen Bank (NCB)
+ncb-bank.vn
+
+# SCB (Saigon Commercial Bank)
+scb.com.vn
+
+# VietBank
+vietbank.com.vn
+
+# PVcomBank
+pvcombank.com.vn
+
+# Cake by VPBank (digital bank)
+cake.vn
+
+# Timo (digital bank — licensed by BVBank)
+timo.vn
+
+# Zing / ZaloPay parent (VNG)
+zalopay.vn
+
+
+# -----------------------------------------------------------------------------
+# LOGISTICS & LAST-MILE DELIVERY
+# -----------------------------------------------------------------------------
+ghn.vn                 # Giao Hàng Nhanh
+ghn.com.vn
+ghtk.vn                # Giao Hàng Tiết Kiệm
+ghtk.com.vn
+ninjavan.vn            # Ninja Van
+ninjavan.com
+jt-express.vn          # J&T Express
+viettelpost.vn
+vnpost.vn
+vnpost.com.vn          # Vietnam Post
+ems.com.vn
+lalamove.com           # Lalamove (operates in VN)
+ahamove.com            # AhaMove
+ahamove.vn
+
+
+# -----------------------------------------------------------------------------
+# E-COMMERCE PLATFORMS
+# -----------------------------------------------------------------------------
 tiki.vn
 sendo.vn
 lazada.vn
 shopee.vn
+shopee.com
+tiktokshop.com         # TikTok Shop (global)
+tiktok.com
 
-# ─── MISC OFFICIAL ───────────────────────────────────────────────────────────
-sunworld.vn
-phuclong.com.vn
-highlands.com.vn
+
+# -----------------------------------------------------------------------------
+# VNPT GROUP (Vietnam Posts and Telecommunications)
+# State-owned telco — ISP, cloud, mobile (VinaPhone)
+# -----------------------------------------------------------------------------
+vnpt.vn
+vnpt.com.vn
+vinaphone.com.vn
+vinaphone.vn
+vnptit.vn              # VNPT Information Technology
+vnpt-i.vn
+vnptidc.com.vn         # VNPT IDC (data centre)
+
+
+# -----------------------------------------------------------------------------
+# MASAN GROUP
+# Major FMCG / consumer goods / resources conglomerate
+# -----------------------------------------------------------------------------
+masan.com.vn
+masan.com
+masanconsumer.com
+masanconsumer.com.vn
+masangroup.com
+chinsu.vn              # Chin-su (sauce brand under Masan)
+wincomer.com.vn        # WinCommerce (supermarket arm)
+winmart.vn
+
+
+# -----------------------------------------------------------------------------
+# VINAMILK (Vietnam Dairy Products)
+# Largest dairy company in Vietnam
+# -----------------------------------------------------------------------------
+vinamilk.com.vn
+vinamilk.vn
+vinamilk.com
+
+
+# -----------------------------------------------------------------------------
+# OTHER MAJOR CORPORATIONS
+# -----------------------------------------------------------------------------
+# PetroVietnam (PVN)
+pvn.vn
+
+# Vietnam Airlines
+vietnamairlines.com
+vietnamairlines.com.vn
+
+# VietJet Air
+vietjetair.com
+vietjet.com
+
+# Bamboo Airways
+bambooairways.com
+
+# Vietravel
+vietravel.com
+vietravel.com.vn
+
+# FE Credit (consumer finance)
+fecredit.com.vn
+
+# Home Credit
+homecredit.vn
+
+# MoMo (e-wallet)
+momo.vn
+mservice.com.vn        # MoMo parent (M_Service)
+
+# VNPay
+vnpay.vn
+vnpay.com.vn
+
+# VNG Corporation
+vng.com.vn
+zalo.me
+zalo.vn
+zing.vn
+
+# Sun Group
+sungroup.com.vn
+
+# Novaland
+novaland.com.vn
+
+# Phat Dat Real Estate
+phatdat.com.vn
+
+# Hoa Phat Group (steel)
+hoaphat.com.vn
+
+# Hoa Sen Group (steel)
+hoasengroup.vn
+
+# Trung Nguyen Legend (coffee)
+trungnguyen.com.vn
+trungnguyen.vn
+
+# Highlands Coffee
+highlandscoffee.com.vn
+
+# The Coffee House
+thecoffeehouse.com
+
+
+# -----------------------------------------------------------------------------
+# GOVERNMENT / REGULATORY DOMAINS (safe-to-whitelist anchors)
+# Never typosquatted in the same commercial sense but useful as safe anchors
+# -----------------------------------------------------------------------------
+gov.vn
+chinhphu.vn
+most.gov.vn            # Ministry of Science & Technology
+mic.gov.vn             # Ministry of Information & Communications
+bkav.com.vn            # Bkav (leading VN cybersecurity firm)
+vncert.vn              # Vietnam CERT
+
+
+# =============================================================================
+# END OF WHITELIST
+# =============================================================================
