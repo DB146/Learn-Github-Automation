@@ -1,22 +1,26 @@
 # .github/workflows/monitor.yml
 # ─────────────────────────────────────────────────────────────────────────────
 # Vietnamese Domain Typosquatting Monitor
-# Runs every 24 hours (and on every push to main for quick testing).
-# If new fake domains are found, commits blacklist.txt back to the repo.
+#
+# Whitelist source of truth: whitelist.txt (repo root).
+# The workflow validates that whitelist.txt exists before the scan runs,
+# surfaces its entry count in the job summary, and commits it alongside
+# blacklist.txt whenever the file has changed.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Domain Typosquatting Monitor
 
 on:
   schedule:
-    # Runs at 02:00 UTC daily (09:00 ICT = Indochina Time)
+    # 02:00 UTC daily = 09:00 Indochina Time (ICT)
     - cron: "0 2 * * *"
-  #push:
-    #branches: [main]
+  # push:
+  #   branches: [main]
   workflow_dispatch:   # Allow manual triggers from the GitHub UI
 
 permissions:
-  contents: write      # Required to push blacklist.txt changes
+  contents: write      # Required to push blacklist.txt / whitelist.txt changes
+  issues: write        # Required to open threat-report issues
 
 jobs:
   scan:
@@ -29,16 +33,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0        # Full history so we can commit & push cleanly
+          fetch-depth: 0   # Full history so we can commit & push cleanly
 
-      # ── 2. Python setup ──────────────────────────────────────────────────
+      # ── 2. Validate whitelist.txt presence ───────────────────────────────
+      # monitor.py raises FileNotFoundError when whitelist.txt is absent,
+      # but this step catches the problem earlier with a human-readable
+      # error and surfaces the whitelist size in the summary for auditing.
+      - name: Validate whitelist.txt
+        run: |
+          if [ ! -f whitelist.txt ]; then
+            echo "::error file=whitelist.txt::whitelist.txt is missing from the repository root. \
+          Add it before running the monitor."
+            exit 1
+          fi
+
+          # Count non-empty, non-comment lines
+          WL_COUNT=$(grep -cE '^[^#[:space:]]' whitelist.txt || true)
+          echo "whitelist_count=${WL_COUNT}" >> "$GITHUB_OUTPUT"
+
+          echo "## Whitelist validation" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ \`whitelist.txt\` found — **${WL_COUNT} protected domain(s)**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+        id: whitelist
+
+      # ── 3. Python setup ──────────────────────────────────────────────────
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
-      # ── 3. Install system deps (dnstwist needs libicu) ───────────────────
+      # ── 4. Install system deps (dnstwist needs libicu) ───────────────────
       - name: Install system libraries
         run: |
           sudo apt-get update -qq
@@ -47,119 +73,160 @@ jobs:
             libssl-dev \
             whois
 
-      # ── 4. Install Python dependencies ───────────────────────────────────
+      # ── 5. Install Python dependencies ───────────────────────────────────
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ── 5. Run the monitor ───────────────────────────────────────────────
+      # ── 6. Run the monitor ───────────────────────────────────────────────
       - name: Run domain monitor
         id: monitor
-        timeout-minutes: 45            # leaves 10 min for commit/push/issue steps
+        timeout-minutes: 45   # Leaves ~10 min for commit / issue steps
         run: |
           python monitor.py
-          # Export the new-domain count for use in later steps
+
           if [ -f scan_summary.json ]; then
             COUNT=$(python -c "import json; d=json.load(open('scan_summary.json')); print(d['new_domains'])")
-            echo "new_count=$COUNT" >> "$GITHUB_OUTPUT"
+            echo "new_count=${COUNT}" >> "$GITHUB_OUTPUT"
           else
             echo "new_count=0" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── 6. Upload artefacts (always, even on failure) ────────────────────
+      # ── 7. Upload artefacts (always, even on failure) ────────────────────
       - name: Upload scan artefacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: scan-results-${{ github.run_id }}
           path: |
+            whitelist.txt
             blacklist.txt
             scan_summary.json
             monitor.log
           retention-days: 30
 
-      # ── 7. Commit & push if new domains were found ───────────────────────
-      - name: Commit updated blacklist
+      # ── 8. Commit updated files back to the repo ─────────────────────────
+      # Stages whitelist.txt as well as blacklist.txt so that any
+      # out-of-band edits to the whitelist are committed in the same
+      # automated commit and remain auditable in Git history.
+      - name: Commit updated blacklist (and whitelist if changed)
         if: steps.monitor.outputs.new_count != '0'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add blacklist.txt scan_summary.json
+          # Stage both files; git will skip whitelist.txt if it's unchanged
+          git add blacklist.txt scan_summary.json whitelist.txt
+
+          # Only proceed if there is actually something to commit
+          if git diff --cached --quiet; then
+            echo "Nothing to commit – blacklist already up to date."
+            exit 0
+          fi
 
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           COUNT=${{ steps.monitor.outputs.new_count }}
-          git commit -m "chore(monitor): add ${COUNT} new suspicious domain(s) [${TIMESTAMP}]"
+          WL_COUNT=${{ steps.whitelist.outputs.whitelist_count }}
+
+          git commit -m "chore(monitor): add ${COUNT} suspicious domain(s) [${TIMESTAMP}]
+
+          Whitelist protected entries: ${WL_COUNT}
+          See scan_summary.json for full domain list."
 
           # Push with retry logic to handle transient network failures
           for i in 1 2 3; do
             git push && break
-            echo "Push attempt $i failed, retrying in 10s…"
+            echo "Push attempt $i failed – retrying in 10 s…"
             sleep 10
           done
 
-      # ── 8. Create a GitHub Issue if new threats found ────────────────────
+      # ── 9. Open a GitHub Issue when new threats are found (≤ 50) ─────────
       - name: Open GitHub Issue for new threats
         if: |
           steps.monitor.outputs.new_count != '0' &&
-          steps.monitor.outputs.new_count != '' &&
+          steps.monitor.outputs.new_count != ''  &&
           fromJSON(steps.monitor.outputs.new_count) <= 50
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const summary = JSON.parse(fs.readFileSync('scan_summary.json', 'utf8'));
+            const wlCount = '${{ steps.whitelist.outputs.whitelist_count }}';
             const domainList = summary.domains.map(d => `- \`${d}\``).join('\n');
+
             const body = [
               `## 🚨 New Suspicious Domains Detected`,
-              `**Scan time:** ${summary.timestamp}`,
-              `**Total new domains:** ${summary.new_domains}`,
               ``,
-              `### Domains`,
+              `| Field | Value |`,
+              `|---|---|`,
+              `| **Scan time** | ${summary.timestamp} |`,
+              `| **New domains found** | ${summary.new_domains} |`,
+              `| **Whitelist entries** | ${wlCount} (see \`whitelist.txt\`) |`,
+              ``,
+              `### Flagged Domains`,
               domainList,
               ``,
-              `> This issue was automatically created by the Domain Monitor workflow.`,
-              `> Review each domain, validate manually, and close this issue when resolved.`,
+              `---`,
+              `> **Next steps**`,
+              `> 1. Verify each domain manually (WHOIS, screenshot, content check).`,
+              `> 2. If legitimate, add to \`whitelist.txt\` and push — it will be excluded from future scans.`,
+              `> 3. If malicious, escalate to the relevant brand's security/legal team.`,
+              `> 4. Close this issue once all domains have been actioned.`,
+              ``,
+              `> *Automatically created by the Domain Monitor workflow.*`,
             ].join('\n');
-           
+
             await github.rest.issues.create({
               owner: context.repo.owner,
-              repo: context.repo.repo,
+              repo:  context.repo.repo,
               title: `[Domain Monitor] ${summary.new_domains} new suspicious domain(s) – ${summary.timestamp}`,
-              body: body,
+              body:  body,
               labels: ['security', 'typosquatting', 'automated'],
             });
-              
+
+      # ── 10. Warn (no issue) when > 50 domains found ──────────────────────
       - name: Warn if too many domains to open issue
         if: |
-              steps.monitor.outputs.new_count != '' &&
-              fromJSON(steps.monitor.outputs.new_count) > 50
+          steps.monitor.outputs.new_count != '' &&
+          fromJSON(steps.monitor.outputs.new_count) > 50
         run: |
-              COUNT=${{ steps.monitor.outputs.new_count }}
-              echo "::warning::Scan found ${COUNT} domains — too many to open an issue (threshold: 50). Review blacklist.txt artifact manually."
-              echo "## ⚠️ Too many domains for auto-issue" >> $GITHUB_STEP_SUMMARY
-              echo "Found **${COUNT}** new domains. Threshold is 50. Download the \`scan-results\` artifact to review." >> $GITHUB_STEP_SUMMARY
+          COUNT=${{ steps.monitor.outputs.new_count }}
+          echo "::warning::Scan found ${COUNT} domains — above the 50-domain \
+          issue threshold. Download the scan-results artifact and review \
+          blacklist.txt manually."
 
-      # ── 9. Summary ───────────────────────────────────────────────────────
+          echo "## ⚠️ Too many domains for auto-issue" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Found **${COUNT}** new domains (threshold: 50)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Download the \`scan-results\` artifact and review \`blacklist.txt\`." >> "$GITHUB_STEP_SUMMARY"
+
+      # ── 11. Final job summary ────────────────────────────────────────────
       - name: Print scan summary
         if: always()
         run: |
-          echo "## Domain Monitor Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Domain Monitor — Scan Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Whitelist entries | ${{ steps.whitelist.outputs.whitelist_count }} |" >> "$GITHUB_STEP_SUMMARY"
+
           if [ -f scan_summary.json ]; then
             COUNT=$(python -c "import json; d=json.load(open('scan_summary.json')); print(d['new_domains'])")
-            echo "**New suspicious domains found:** ${COUNT}" >> $GITHUB_STEP_SUMMARY
+            TS=$(python    -c "import json; d=json.load(open('scan_summary.json')); print(d['timestamp'])")
+            echo "| New suspicious domains | ${COUNT} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Scan completed at | ${TS} |" >> "$GITHUB_STEP_SUMMARY"
+
             if [ "$COUNT" -gt "0" ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### New domains" >> $GITHUB_STEP_SUMMARY
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "### New domains" >> "$GITHUB_STEP_SUMMARY"
               python -c "
           import json
           d = json.load(open('scan_summary.json'))
           for dom in d['domains']:
               print(f'- \`{dom}\`')
-          " >> $GITHUB_STEP_SUMMARY
+          " >> "$GITHUB_STEP_SUMMARY"
             fi
           else
-            echo "**No new suspicious domains found.**" >> $GITHUB_STEP_SUMMARY
+            echo "| New suspicious domains | 0 |" >> "$GITHUB_STEP_SUMMARY"
           fi
