@@ -5,6 +5,11 @@ Vietnamese Domain Typosquatting & Fake Marketing Site Monitor
 Proactively scans for typosquatted / fake-brand domains targeting
 major Vietnamese corporations and appends findings to blacklist.txt.
 
+Whitelist source of truth: whitelist.txt (repo root).
+The hardcoded OFFICIAL_WHITELIST constant has been removed; all safe
+domains must live in whitelist.txt so that updates are auditable via
+Git history and do not require touching this script.
+
 Dependencies:
     pip install dnspython dnstwist tldextract requests
 """
@@ -20,10 +25,13 @@ from pathlib import Path
 from typing import Optional
 import concurrent.futures
 
-# Add near the top of monitor.py
+# ---------------------------------------------------------------------------
+# Tunables
+# ---------------------------------------------------------------------------
 MAX_CANDIDATES_PER_BRAND = 500   # hard cap per brand
-DNS_WORKERS = 20                  # concurrent DNS threads
-DNS_TIMEOUT = 2.0                 # seconds per lookup (was 3.0)
+DNS_WORKERS              = 20    # concurrent DNS threads
+DNS_TIMEOUT              = 2.0   # seconds per lookup
+
 # ---------------------------------------------------------------------------
 # Optional / graceful imports
 # ---------------------------------------------------------------------------
@@ -64,28 +72,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # ── DATA STRUCTURES ──────────────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
-
-# Official / whitelisted domains (never flagged)
-OFFICIAL_WHITELIST: list[str] = [
-    # Viettel
-    "viettel.vn", "viettelstore.vn", "viettel.com.vn",
-    # FPT
-    "fpt.com.vn", "fptshop.com.vn", "fpttelecom.com.vn", "fpt.vn",
-    # Vingroup family
-    "vingroup.net", "vinfast.vn", "vinhomes.vn", "vincom.com.vn",
-    "vinmec.com", "vinschool.edu.vn",
-    # Mobile World / Dien May Xanh
-    "thegioididong.com", "dienmayxanh.com", "bachhoaxanh.com",
-    # Banking
-    "vietcombank.com.vn", "techcombank.com.vn", "vpbank.com.vn",
-    "acb.com.vn", "mbbank.com.vn",
-    # Logistics
-    "ghn.vn", "ghtk.vn",
-    # Others
-    "vinamilk.com.vn", "masan.com.vn", "masanconsumer.com",
-    "tiki.vn", "sendo.vn", "lazada.vn",
-    "vnpt.vn", "vinaphone.com.vn",
-]
 
 # Brand keywords to monitor
 TARGET_BRANDS: list[str] = [
@@ -130,12 +116,84 @@ HOMOGLYPHS: dict[str, list[str]] = {
 # ---------------------------------------------------------------------------
 # ── FILE PATHS ───────────────────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
-BASE_DIR    = Path(__file__).parent
+BASE_DIR       = Path(__file__).parent
 WHITELIST_FILE = BASE_DIR / "whitelist.txt"
 BLACKLIST_FILE = BASE_DIR / "blacklist.txt"
 
 # ---------------------------------------------------------------------------
-# ── UTILITY HELPERS ──────────────────────────────────────────────────────────
+# ── WHITELIST LOADING ────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+
+def load_whitelist() -> set[str]:
+    """
+    Load the whitelist exclusively from whitelist.txt.
+
+    The function builds a comprehensive lookup set that covers three forms
+    of every whitelisted entry so that no legitimate domain slips through:
+
+      1. The exact lowercased entry as written   ("fptshop.com.vn")
+      2. The registrable base extracted by tldextract ("fptshop.com.vn")
+         — for most entries these are identical, but subdomains like
+         "vpbank.online-banking.vpbank.com.vn" collapse correctly.
+      3. The bare SLD (second-level domain label, "fptshop") — used to
+         short-circuit brand-prefix checks without a TLD.
+
+    Raises FileNotFoundError if whitelist.txt is missing, so CI fails loudly
+    rather than running an unprotected scan.
+    """
+    if not WHITELIST_FILE.exists():
+        raise FileNotFoundError(
+            f"whitelist.txt not found at {WHITELIST_FILE}. "
+            "The file must exist in the repository root before scanning."
+        )
+
+    raw_lines = WHITELIST_FILE.read_text(encoding="utf-8").splitlines()
+    entries: set[str] = set()
+
+    for line in raw_lines:
+        line = line.strip().lower()
+        if not line or line.startswith("#"):
+            continue
+
+        entries.add(line)                          # exact form
+        entries.add(extract_base(line))            # registrable base
+        entries.add(_bare_sld(line))               # bare label (e.g. "fptshop")
+
+    logger.info(
+        "Whitelist loaded: %d raw entries → %d lookup tokens from %s",
+        sum(1 for ln in raw_lines
+            if ln.strip() and not ln.strip().startswith("#")),
+        len(entries),
+        WHITELIST_FILE,
+    )
+    return entries
+
+
+def _bare_sld(domain: str) -> str:
+    """Return just the SLD label, e.g. 'fptshop' from 'fptshop.com.vn'."""
+    if HAS_TLDEXTRACT:
+        return tldextract.extract(domain).domain.lower()
+    # Fallback: first label before the first dot
+    return domain.split(".")[0].lower()
+
+
+def is_whitelisted(domain: str, whitelist: set[str]) -> bool:
+    """
+    Return True if *domain* (or any of its derived forms) appears in the
+    whitelist set.  Checks:
+      - exact full domain
+      - registrable base  (strips subdomain prefix)
+      - bare SLD label    (strips TLD entirely)
+    """
+    domain = domain.strip().lower().rstrip(".")
+    return (
+        domain in whitelist
+        or extract_base(domain) in whitelist
+        or _bare_sld(domain) in whitelist
+    )
+
+# ---------------------------------------------------------------------------
+# ── OTHER FILE HELPERS ────────────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
 
 def load_file_set(path: Path) -> set[str]:
@@ -159,7 +217,7 @@ def append_to_blacklist(domains: list[str]) -> None:
 
 
 def extract_base(domain: str) -> str:
-    """Return the registrable part of a domain (e.g. foo.com.vn -> foo.com.vn)."""
+    """Return the registrable part of a domain (e.g. foo.com.vn → foo.com.vn)."""
     if HAS_TLDEXTRACT:
         ext = tldextract.extract(domain)
         if ext.domain and ext.suffix:
@@ -170,7 +228,7 @@ def extract_base(domain: str) -> str:
 # ── DNS RESOLUTION ───────────────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
 
-def resolve_a_record(domain: str, timeout: float = 3.0) -> Optional[str]:
+def resolve_a_record(domain: str, timeout: float = DNS_TIMEOUT) -> Optional[str]:
     """
     Return the first A-record IP for *domain*, or None if unresolvable.
     Uses dnspython when available, else falls back to socket.getaddrinfo.
@@ -199,7 +257,7 @@ def resolve_a_record(domain: str, timeout: float = 3.0) -> Optional[str]:
 
 def generate_keyword_permutations(brand: str) -> list[str]:
     """
-    Generate domain *names* (without TLD) by combining brand + SEO keywords.
+    Generate domain names (without TLD) by combining brand + SEO keywords.
 
     Patterns:
         brand-keyword      (e.g. viettel-khuyenmai)
@@ -222,18 +280,15 @@ def generate_homoglyph_permutations(brand: str, max_swaps: int = 1) -> list[str]
     """
     Generate candidate domain names by substituting characters with homoglyphs.
 
-    *max_swaps* limits the number of simultaneous substitutions to avoid
-    an exponential explosion (default=1 → one substitution at a time).
+    *max_swaps* limits simultaneous substitutions to avoid exponential explosion
+    (default=1 → one substitution at a time).
     """
     results: set[str] = set()
     chars = list(brand)
-
-    # Collect positions that have homoglyphs
     swap_positions = [i for i, ch in enumerate(chars) if ch in HOMOGLYPHS]
 
     for num_swaps in range(1, max_swaps + 1):
         for positions in itertools.combinations(swap_positions, num_swaps):
-            # Cartesian product of substitutions at each chosen position
             glyph_choices = [HOMOGLYPHS[chars[p]] for p in positions]
             for combo in itertools.product(*glyph_choices):
                 mutated = chars[:]
@@ -249,30 +304,25 @@ def generate_homoglyph_permutations(brand: str, max_swaps: int = 1) -> list[str]
 def generate_typo_permutations(brand: str) -> list[str]:
     """
     Classic typosquatting patterns:
-        - Character deletion (viettl)
-        - Character doubling (vieettel)
-        - Adjacent-key swaps (viettel → viertel)
-        - Missing hyphen / extra hyphen
-        - Common prefix/suffix insertions (my-, get-, use-, -vn, -net)
+        - Character deletion
+        - Character doubling
+        - Adjacent-key swaps
+        - Common prefix/suffix insertions
     """
     results: set[str] = set()
     n = len(brand)
 
-    # Deletion
     for i in range(n):
-        results.add(brand[:i] + brand[i+1:])
+        results.add(brand[:i] + brand[i+1:])           # deletion
 
-    # Doubling
     for i in range(n):
-        results.add(brand[:i] + brand[i] * 2 + brand[i+1:])
+        results.add(brand[:i] + brand[i] * 2 + brand[i+1:])  # doubling
 
-    # Swap adjacent
     for i in range(n - 1):
         lst = list(brand)
         lst[i], lst[i+1] = lst[i+1], lst[i]
-        results.add("".join(lst))
+        results.add("".join(lst))                       # adjacent swap
 
-    # Prefix / suffix padding
     for pad in ["my", "get", "use", "e", "i", "dang-ky", "chinh-hang"]:
         results.add(f"{pad}-{brand}")
         results.add(f"{brand}-{pad}")
@@ -292,7 +342,6 @@ def build_full_domain_list(brand: str) -> list[str]:
     names.update(generate_homoglyph_permutations(brand, max_swaps=1))
     names.update(generate_typo_permutations(brand))
 
-    # Add Vietnamese subdomain-style patterns (hanoi.brand-kw.vn)
     for kw in ["hanoi", "hcm", "hue", "danang"]:
         names.add(f"{kw}.{brand}-khuyenmai")
         names.add(f"{kw}.{brand}-uudai")
@@ -312,11 +361,7 @@ def run_dnstwist(brand: str, tld: str = ".vn") -> list[str]:
     """
     Use dnstwist to generate advanced homoglyph / IDN / punycode permutations.
 
-    dnstwist handles Unicode confusables such as:
-        vıettel.vn  (ı = U+0131 LATIN SMALL LETTER DOTLESS I)
-        vіettel.vn  (і = U+0456 CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I)
-
-    Returns a list of domain strings that have *registered* DNS records.
+    Returns a list of domain strings that have registered DNS records.
     """
     if not HAS_DNSTWIST:
         logger.debug("dnstwist unavailable – skipping IDN checks for %s", brand)
@@ -326,14 +371,12 @@ def run_dnstwist(brand: str, tld: str = ".vn") -> list[str]:
     logger.info("  [dnstwist] Scanning permutations for %s …", seed)
 
     try:
-        # dnstwist ≥ 20230901 exposes a Python API
         results = dnstwist.run(
             domain=seed,
-            registered=True,       # only return domains with DNS records
+            registered=True,
             format="list",
             threads=8,
         )
-        # results is a list of dicts: {"fuzzer": "...", "domain": "...", ...}
         found: list[str] = []
         for entry in results:
             domain = entry.get("domain", "")
@@ -341,7 +384,6 @@ def run_dnstwist(brand: str, tld: str = ".vn") -> list[str]:
                 found.append(domain.lower())
         logger.info("  [dnstwist] Found %d registered permutations for %s", len(found), seed)
         return found
-
     except Exception as exc:
         logger.warning("dnstwist error for %s: %s", seed, exc)
         return []
@@ -350,29 +392,53 @@ def run_dnstwist(brand: str, tld: str = ".vn") -> list[str]:
 # ── MAIN SCANNER ─────────────────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
 
-def check_domain(domain: str, whitelist: set, blacklist: set):
-    """Worker function for thread pool."""
-    base = extract_base(domain)
-    if base in whitelist or domain.lower() in whitelist:
+def check_domain(
+    domain: str,
+    whitelist: set[str],
+    blacklist: set[str],
+) -> Optional[str]:
+    """
+    Worker function executed in the thread pool.
+
+    Returns the lowercased domain string if it:
+      - is NOT whitelisted (via all three lookup forms)
+      - is NOT already in the blacklist
+      - resolves to at least one A record
+
+    Returns None otherwise.
+    """
+    # Full whitelist check: exact, base, and bare SLD
+    if is_whitelisted(domain, whitelist):
         return None
+
+    # Already known-bad — skip to avoid duplicate entries
+    base = extract_base(domain)
     if base in blacklist or domain.lower() in blacklist:
         return None
+
     ip = resolve_a_record(domain, timeout=DNS_TIMEOUT)
     return domain.lower() if ip else None
 
-def scan_brand(brand, whitelist, existing_blacklist):
+
+def scan_brand(
+    brand: str,
+    whitelist: set[str],
+    existing_blacklist: set[str],
+) -> list[str]:
     logger.info("Scanning brand: %s", brand.upper())
 
     candidates = build_full_domain_list(brand)
 
-    # Hard cap to avoid timeout
     if len(candidates) > MAX_CANDIDATES_PER_BRAND:
-        logger.warning("  Capping %d candidates to %d", len(candidates), MAX_CANDIDATES_PER_BRAND)
+        logger.warning(
+            "  Capping %d candidates to %d for brand %s",
+            len(candidates), MAX_CANDIDATES_PER_BRAND, brand,
+        )
         candidates = candidates[:MAX_CANDIDATES_PER_BRAND]
 
     logger.info("  Checking %d domain candidates (threaded)", len(candidates))
 
-    new_finds = []
+    new_finds: list[str] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=DNS_WORKERS) as executor:
         futures = {
             executor.submit(check_domain, d, whitelist, existing_blacklist): d
@@ -384,30 +450,32 @@ def scan_brand(brand, whitelist, existing_blacklist):
                 logger.warning("  [HIT] %s", result)
                 new_finds.append(result)
 
-    # dnstwist pass (keep but limit TLDs)
-    for tld in [".vn", ".com"]:   # reduced from 3 TLDs to 2
-        dnstwist_hits = run_dnstwist(brand, tld)
-        for domain in dnstwist_hits:
-            base = extract_base(domain)
-            if base not in whitelist and base not in existing_blacklist \
+    # dnstwist pass (two primary TLDs to stay within timeout budget)
+    for tld in [".vn", ".com"]:
+        for domain in run_dnstwist(brand, tld):
+            if not is_whitelisted(domain, whitelist) \
+                    and extract_base(domain) not in existing_blacklist \
                     and domain not in new_finds:
                 new_finds.append(domain.lower())
 
     logger.info("  Brand %s: %d new domain(s) found.", brand, len(new_finds))
     return new_finds
 
+
 def run_scan() -> None:
-    """Entry point: scan all target brands and update blacklist.txt."""
+    """Entry point: load whitelist, scan all target brands, update blacklist.txt."""
     logger.info("=" * 60)
-    logger.info("Vietnamese Domain Monitor – scan started %s",
-                datetime.datetime.utcnow().isoformat())
+    logger.info(
+        "Vietnamese Domain Monitor – scan started %s",
+        datetime.datetime.utcnow().isoformat(),
+    )
     logger.info("=" * 60)
 
-    # Load reference files
-    whitelist = load_file_set(WHITELIST_FILE)
-    whitelist.update(extract_base(d) for d in OFFICIAL_WHITELIST)
-    whitelist.update(d.lower() for d in OFFICIAL_WHITELIST)
+    # ── Whitelist: single source of truth is whitelist.txt ──────────────────
+    # Raises FileNotFoundError if the file is absent — CI job will fail loudly.
+    whitelist = load_whitelist()
 
+    # ── Blacklist: domains already actioned ─────────────────────────────────
     existing_blacklist = load_file_set(BLACKLIST_FILE)
 
     all_new: list[str] = []
@@ -418,14 +486,17 @@ def run_scan() -> None:
     if all_new:
         logger.info("Total new suspicious domains: %d", len(all_new))
         append_to_blacklist(all_new)
-        # Signal to CI that changes were made
         summary_file = BASE_DIR / "scan_summary.json"
         summary_file.write_text(
-            json.dumps({
-                "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-                "new_domains": len(all_new),
-                "domains": all_new,
-            }, ensure_ascii=False, indent=2),
+            json.dumps(
+                {
+                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                    "new_domains": len(all_new),
+                    "domains": all_new,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
             encoding="utf-8",
         )
         logger.info("Scan complete. Results written.")
