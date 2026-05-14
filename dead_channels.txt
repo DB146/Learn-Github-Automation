@@ -1,5 +1,4 @@
  Tyc Sport Argentina | http://myxpanel.pro:80/Martin/Martin/670987	
- HTV7 - Đài PTTH Thành Phố Hồ Chí Minh | https://vc.101vn.com/htv/htvcmb.php?id=256
  Huế TV - Báo và PTTH Huế | https://live.trt.com.vn/TRT-Online/chunklist.m3u8
  NHK World | https://live.fptplay53.net/fnxhd2/nhkworld_vhls.smil/chunklist_b5000000.m3u8 
  Đồng Tháp | https://64d0d74b76158.streamlock.net/THDTR/thdtradio/chunklist.m3u8
@@ -31,5 +30,4 @@ h_550/cctv11_logo_by_amazingtoludada3000_dew5uz3-fullview.png?token=eyJ0eXAiOiJK
  CCTV17 | http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221225765/index.m3u8
  PPTV36 | https://cdn6.goprimetime.info/feed/eI5rczhSQpWBcgOtqRLNWw/chpptvhd3/index.m3u8
  MONO 29 | https://cdn6.goprimetime.info/feed/eI5rczhSQpWBcgOtqRLNWw/chmono293/index.m3u8
- Thairath TV 32 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776225&extension=ts&play_token=TGCPfAlA9v
  Ramsey HangMeas Melody UHD | http://abclive.malisresidences.com:1935/hmmel/_definst_/smil:hmmel.smil/playlist.m3u8
