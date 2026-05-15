@@ -1,41 +1,43 @@
 @@||adguard-dns.io^
 !Bad App
-||cnet.com^
-||download.com^
-||zdnet.de^
-||softonic.com^
-||opera.com^
-||mcafee.com^
-||mcafeemobilesecurity.com^
-||mcafeewebadvisor.com^
-||avast.com^
-||avg.com^
-||gendigital.com^
-||norton.com^
-||nortonlifelock.com^
-||avira.com^
-||ccleaner.com^
-||ccleanercloud.com^
-||privateinternetaccess.com^
-||expressvpn.com^
-||zenmate.com^
-||cyberghostvpn.com^
-||kape.com^
-||vpnmentor.com^
-||wizcase.com^
+/(cnet\.com|download\.com|zdnet\.de|softonic\.com|opera\.com|mcafee\.com|mcafeemobilesecurity\.com|mcafeewebadvisor\.com|avast\.com|avg\.com|gendigital\.com|norton\.com|nortonlifelock\.com|avira\.com|ccleaner\.com|ccleanercloud\.com|privateinternetaccess\.com|expressvpn\.com|zenmate\.com|cyberghostvpn\.com|kape\.com|vpnmentor\.com|wizcase\.com)/
+!||cnet.com^
+!||download.com^
+!||zdnet.de^
+!||softonic.com^
+!||opera.com^
+!||mcafee.com^
+!||mcafeemobilesecurity.com^
+!||mcafeewebadvisor.com^
+!||avast.com^
+!||avg.com^
+!||gendigital.com^
+!||norton.com^
+!||nortonlifelock.com^
+!||avira.com^
+!||ccleaner.com^
+!||ccleanercloud.com^
+!||privateinternetaccess.com^
+!||expressvpn.com^
+!||zenmate.com^
+!||cyberghostvpn.com^
+!||kape.com^
+!||vpnmentor.com^
+!||wizcase.com^
 !Made-For-Advertisement
-||metaqore.net^
-||modabright.net^
-||thumpnews.com^
-||mobileera.net^
-||futurebyte.net^
-||tasteezy.net^
-||flavorvoyage.net^
-||phonevibe.net^
-||quantixa.net^
+/(metaqore\.net|modabright\.net|thumpnews\.com|mobileera\.net|futurebyte\.net|tasteezy\.net|flavorvoyage\.net|phonevibe\.net|quantixa\.net)/
+!||metaqore.net^
+!||modabright.net^
+!||thumpnews.com^
+!||mobileera.net^
+!||futurebyte.net^
+!||tasteezy.net^
+!||flavorvoyage.net^
+!||phonevibe.net^
+!||quantixa.net^
 !Regex
 ||/xn--/^
-
+!Bad Content
 /^https?:\/\/[^\/?#]*(?:bestgore|seegore|goresee|goregrish|gorecenter|gorecentre|goreforum|goreforums|goredb|gorehub|gorezone|goretube|gorevideo|gorevideos|gorewatch|gorestream|goreplanet|gorebook|gorebay|goredump|goregallery|goremirror|gorenation|goresociety|gorepit|goreportal|goreleak|goreleaks|goreflix|goreground|goresites|deepgore|deepgoretube|livegore|realgore|realitygore|xgore|forogore)[^\/?#]*(?:[\/?#:]|$)/
 /^https?:\/\/[^\/?#]*(?:shockgore|shocksite|shocksites|shockvideo|shockvideos|shocktube|shockmansion|shockchan|shockarchive|shockhub|documentingreality|watchpeopledie|kaotic|hoodsite|ogrish|crazyshit|deadhouse|deathtube|beheadedart|runthegauntlet|damagedcorpse|leakedreality|leakreality)[^\/?#]*(?:[\/?#:]|$)/
 /^https?:\/\/[^\/?#]*(?:goatse|meatspin|lemonparty|tubgirl|painolympics|2girls1cup|1girl1bowl|1girl1pitcher|1priest1nun|kidsin(?:a)?sandbox|jar(?:squatter)?|kekma|offended|takethislollipop)[^\/?#]*(?:[\/?#:]|$)/
@@ -47,6 +49,7 @@
 /^https?:\/\/[^\/?#]*(?:[a-z0-9-]+\.)+(?:chaturbate\.com|xhamster\.com|xnxx\.com|xvideos\.com|pornhub\.com|stripchat\.com|bongacams\.com|livejasmin\.com|onlyfans\.com|fansly\.com|redtube\.com|youporn\.com|eporner\.com|tnaflix\.com)(?:[\/?#:]|$)/
 /^https?:\/\/(?:[^\/?#.]+\.)*(?:[a-z0-9-]*(?:sexe|sexo|sexcam|sexchat|sexshop|sexvideo|sexfilm|erotic|erotik|erotica|escort|escorts|webcam|camgirl|camgirls|camsex|milf|lesbian|lesbians|gayporn|hardcore|amateur|teenporn|anal|bondage|mature|babes|pornstar|freeporn|phonesex|telefonsex|geile|gratis)[a-z0-9-]*)\.(?:com|net|org|info|biz|io|co|tv|to|cc|me|xyz|online|site|live|club|app|fun|tube|video|pics|nl|de|fr|es|it|ru|br|pl|eu|uk)(?:[\/?#:]|$)/
 /^https?:\/\/(?:[^\/?#.]+\.)*(?:[a-z0-9-]*(?:porn|xxx|xnxx|xvideos|hentai|nude|pussy|cock|bdsm|escort|webcam|camgirl|sexcam|sexe|sexo|erotic|shemale|gore)[a-z0-9-]*)\.(?:free\.fr|online\.fr|voila\.fr|site\.voila\.fr|cjb\.net|webcindario\.com|webobo\.com|host\.sk|sapo\.pt|wanadoo\.es|skyrock\.com|freehostia\.com|tripod\.com)(?:[\/?#:]|$)/
+!Piracy Malware
 ||*massgrave.*^$denyallow=massgrave.dev|massgrave.pages.dev|massgrave.visualstudio.com
 ||*massgrav.*^
 ||*massgraves.*^
@@ -69,6 +72,82 @@
 ||*iobit.*^
 ||*thepiratebay.*^$denyallow=thepiratebay.org
 ||*kickasstorrents.*^
+!SEO
+# ── GROUP A (Telecom + Vin* conglomerates)
+/^(?:www\.)?(?:viettel|fpt|vinfast|vinhomes|vingroup)[-]?(?:khuyenmai|uudai|tongdai|lapmang|goicuoc|tuyendung|mienphi|vayvon|chinhhang|giare|sale|san-sale|vip|official|dangky|dichvu|hotline|lienhe|sim|goicom|internet|fiber|4g|5g|shopee|lazada|tgdd)\./
+/^(?:www\.)?(?:khuyenmai|uudai|tongdai|lapmang|goicuoc|tuyendung|mienphi|vayvon|chinhhang|giare|sale|vip|official|dangky|dichvu|hotline|lienhe|sim|goicom|internet|fiber|4g|5g)[-]?(?:viettel|fpt|vinfast|vinhomes|vingroup)\./
+
+# ── GROUP B (vnpt | vinaphone)
+/^(?:www\.)?(?:vnpt|vinaphone)[-]?(?:khuyenmai|uudai|tongdai|lapmang|goicuoc|tuyendung|mienphi|vip|official|dangky|dichvu|hotline|lienhe|sim|goicom|internet|fiber|4g|5g)\./
+/^(?:www\.)?(?:khuyenmai|uudai|tongdai|lapmang|goicuoc|tuyendung|mienphi|vip|official|dangky|dichvu|hotline|lienhe|sim|goicom|internet|fiber|4g|5g)[-]?(?:vnpt|vinaphone)\./
+
+# ── GROUP C (Banks)
+/^(?:www\.)?(?:vietcombank|techcombank|vpbank|acb)[-]?(?:khuyenmai|uudai|tongdai|tuyendung|mienphi|vayvon|vip|official|dangky|dichvu|hotline|lienhe)\./
+/^(?:www\.)?(?:khuyenmai|uudai|vayvon|vip|official|dangky|dichvu|hotline|lienhe)[-]?(?:vietcombank|techcombank|vpbank|acb)\./
+
+# ── GROUP D (FMCG / retail)
+/^(?:www\.)?(?:thegioididong|tgdd|dienmayxanh|vinamilk|masan)[-]?(?:khuyenmai|uudai|tongdai|tuyendung|mienphi|chinhhang|giare|sale|san-sale|vip|official|dangky|dichvu|hotline|lienhe|shopee|lazada)\./
+/^(?:www\.)?(?:khuyenmai|uudai|giare|sale|vip|official|dangky|dichvu|hotline|lienhe)[-]?(?:thegioididong|tgdd|dienmayxanh|vinamilk|masan)\./
+
+# ── GROUP E (Logistics)
+/^(?:www\.)?(?:ghn|ghtk)[-]?(?:khuyenmai|uudai|tongdai|tuyendung|mienphi|vip|official|dangky|dichvu|hotline|lienhe)\./
+/^(?:www\.)?(?:khuyenmai|uudai|vip|official|dangky|dichvu|hotline)[-]?(?:ghn|ghtk)\./
+
+# ── MANDATORY HYPHEN RULES FOR RISKY KEYWORDS 
+# Forces a hyphen to block 'viettel-store.com' but allow official 'viettelstore.vn'
+/^(?:www\.)?(?:viettel|fpt|vinfast|vinhomes|vingroup|vnpt|vinaphone|vietcombank|techcombank|vpbank|acb|thegioididong|tgdd|dienmayxanh|vinamilk|masan|ghn|ghtk)[-](?:online|store|hanoi|hcm)\./
+/^(?:www\.)?(?:online|store|hanoi|hcm)[-](?:viettel|fpt|vinfast|vinhomes|vingroup|vnpt|vinaphone|vietcombank|techcombank|vpbank|acb|thegioididong|tgdd|dienmayxanh|vinamilk|masan|ghn|ghtk)\./
+
+# ── CITY-PREFIX SCAM SUBDOMAINS
+/^(?:hanoi|hcm|hue|danang)\.(?:viettel|fpt|vinfast|vinhomes|vingroup|thegioididong|dienmayxanh|vinamilk|masan|vietcombank|techcombank|vpbank|acb|ghn|ghtk|vnpt|vinaphone)[-](?:khuyenmai|uudai|sale|giare|online|store|vip|dichvu|hotline)\./
+
+# ── TYPO VARIANTS (Scrubbed of global brand/acronym overlaps)
+/^(?:www\.)?(?:viette[^l]|viettel{2,}|viettle|veittel|ivttel|viettl|vietell|vietel|viettet|viettelx|xviettel)\./
+/^(?:www\.)?(?:ffpt|fptt|fp7)\.(?:com|net|vn|xyz|site|top|store|vip|online|info|ink|com\.vn|net\.vn|org\.vn)/
+/^(?:www\.)?(?:vinfaast|vinfats|vinfsast|vimfast|vinfasst|vvinfast|vinfsat)\./
+/^(?:www\.)?(?:vinhomess|vnhomes|vinhome[^s])\./
+/^(?:www\.)?(?:vingroupp|winggroup)\./
+/^(?:www\.)?(?:vietcombannk|vietcomhank|vietcombak|vietcmbank|vietcombonk)\./
+/^(?:www\.)?(?:techcombannk|techcombonk|techcomhank|techcombak)\./
+/^(?:www\.)?(?:vpbannk|vpbonk|vvpbank|v0bank)\./
+/^(?:www\.)?(?:vinamiilk|vinamllk|vinami1k)\./
+/^(?:www\.)?(?:vnp7|vvnpt|vn0t)\./
+/^(?:www\.)?(?:vinaph0ne|vinaphome)\./
+
+# ── PADDING (Prefix & Suffix)
+/^(?:www\.)?(?:my|get|use|e|i|dang-ky|chinh-hang)[-](?:viettel|fpt|vinfast|vinhomes|vingroup|vietcombank|techcombank|vpbank|vinamilk|vnpt|vinaphone)\./
+/^(?:www\.)?(?:viettel|fpt)[-](?:my|get|use|pad|dang-ky|chinh-hang)\./
+
+# ── HOMOGLYPH VARIANTS 
+/^(?:www\.)?(?:w[ie]3tt[e3]l|wi[e3]tt[e3]l|νi[e3]tt[e3]l|vi[e3]7t[e3]l|vi[e3]tt3l|1iettel|vl3ttel)\./
+/^(?:www\.)?(?:vi3tc0mb4nk|vi[e3]tc[o0]mb[@4]nk|v1etcombank|vi3tcombank|vietc0mbank|vietcomb4nk)\./
+/^(?:www\.)?(?:t3chc0mb4nk|t3chcombank|techc0mbank|techcomb4nk|t3chc0mbank)\./
+/^(?:www\.)?(?:vp6ank|vpb4nk|vp[@4]nk|v[p][b6][@4]nk)\./
+/^(?:www\.)?(?:v1nf[a4]st|vinf4st|vinf@st)\./
+/^(?:www\.)?(?:v1n[a4]m[i1]lk|vin4m[i1]lk|vinam1lk)\./
+/^(?:www\.)?(?:v1nh[o0]mes|vinh0mes)\./
+/^(?:www\.)?(?:v1ngr[o0]up|ving9oup|vingr0up)\./
+/^(?:www\.)?νnpt\./
+/^(?:www\.)?(?:v1n[a4]ph[o0]ne|vin4ph[o0]ne|vinaph0ne)\./
+
+# ── PUNYCODE / IDN HOMOGRAPH (Compliant with RFC 3492 base stripping)
+/^(?:www\.)?xn--(?:vittel|vitcombank|tchcombank|vnfast|vnhomes|vpbank|vnamilk|vingrp|inmyxanh)[a-z0-9-]*\./
+
+# ── HIGH-RISK TLD ABUSE
+/^(?:www\.)?(?:viettel|fptshop|vinfast|vinhomes|vingroup|thegioididong|dienmayxanh|vinamilk|masan|vietcombank|techcombank|vpbank|acb|ghn|ghtk|vnpt|vinaphone)\.(?:xyz|top|site|ink|store|online|vip|info)$/
+
+# ── SCAM PATTERN CATCH-ALLS
+/^(?:www\.)?(?:viettel|fpt|vinfast|vinhomes|vingroup|thegioididong|dienmayxanh|vinamilk|masan|vietcombank|techcombank|vpbank|acb|ghn|ghtk|vnpt|vinaphone)[a-z0-9-]{0,3}(?:khuyenmai|uudai|vayvon|tongdai|lapmang|goicuoc|mienphi|dangky)\./
+/^(?:www\.)?(?:khuyenmai|uudai|vayvon|tongdai|lapmang|goicuoc|mienphi|dangky)[a-z0-9-]{0,3}(?:viettel|fpt|vinfast|vinhomes|vingroup|thegioididong|dienmayxanh|vinamilk|masan|vietcombank|techcombank|vpbank|acb|ghn|ghtk|vnpt|vinaphone)\./
+
+# ── SPECIFIC SCAM PATTERNS
+/^(?:www\.)?(?:vayvon|vay-von|vayonline|vaynhanh)[a-z0-9-]{0,20}(?:bank|combank|techcom|vpbank|vietcom|acb)/
+/^(?:www\.)?(?:bank|combank|techcom|vpbank|vietcom|acb)[a-z0-9-]{0,20}(?:vayvon|vay-von|vayonline|vaynhanh)/
+/^(?:www\.)?hotline[-](?:viettel|fpt|vnpt|vinaphone|vietcombank|techcombank|vpbank|acb|vinfast|ghn|ghtk)\./
+/^(?:www\.)?tong-?dai[-](?:viettel|fpt|vnpt|vinaphone|vietcombank|techcombank|vpbank|acb|vinfast)\./
+/^(?:www\.)?dang[-]?ky[-]?(?:goi[-]?|mang[-]?|sim[-]?){0,2}(?:viettel|fpt|vnpt|vinaphone|vinfast|thegioididong|vietcombank|techcombank|vpbank)\./
+/^(?:www\.)?(?:san-sale|khuyenmai|sale|giam-gia|uudai|sim|dangkysim|sim-so|so-dep|lapmang|lap-mang|dangkymang|dang-ky-mang|internet|fiber|cap-quang)[-](?:viettel|fpt|vnpt|vinaphone|vinfast|thegioididong|dienmayxanh|vinamilk|masan|vietcombank|techcombank|vpbank|acb)\./
+/^(?:www\.)?(?:viettel|fpt|vnpt|vinaphone)[-](?:sim|dangkysim|sim-so|so-dep|lapmang|lap-mang|dangkymang|dang-ky-mang|internet|fiber|cap-quang)\./
 !Zalo
 /^(.*\.)?((graph|oa|sentry-mini|video)\.zalo\.me|zalo\.(cloud|video)|zmdcdn\.me|fiza\.ai|zagoo\.vn)$/
 /^(.*\.)?(miniappstore\.api\.zalo\.me|zinst-stc\.zdn\.vn|stc-fin\.zdn\.vn|stc-oa\.zdn\.vn|stc-sp\.zadn\.vn|stc-zmp\.zadn\.vn|opentracking\.zalopay\.vn|social\.zalopay\.vn|broadcast\.api\.zaloapp\.com|channel-zinstant\.api\.zaloapp\.com|discovery\.api\.zaloapp\.com|universal-zinstant\.api\.zaloapp\.com|zsp\.zaloapp\.com)$/
