@@ -50,9 +50,7 @@
 /^https?:\/\/(?:[^\/?#.]+\.)*(?:[a-z0-9-]*(?:sexe|sexo|sexcam|sexchat|sexshop|sexvideo|sexfilm|erotic|erotik|erotica|escort|escorts|webcam|camgirl|camgirls|camsex|milf|lesbian|lesbians|gayporn|hardcore|amateur|teenporn|anal|bondage|mature|babes|pornstar|freeporn|phonesex|telefonsex|geile|gratis)[a-z0-9-]*)\.(?:com|net|org|info|biz|io|co|tv|to|cc|me|xyz|online|site|live|club|app|fun|tube|video|pics|nl|de|fr|es|it|ru|br|pl|eu|uk)(?:[\/?#:]|$)/
 /^https?:\/\/(?:[^\/?#.]+\.)*(?:[a-z0-9-]*(?:porn|xxx|xnxx|xvideos|hentai|nude|pussy|cock|bdsm|escort|webcam|camgirl|sexcam|sexe|sexo|erotic|shemale|gore)[a-z0-9-]*)\.(?:free\.fr|online\.fr|voila\.fr|site\.voila\.fr|cjb\.net|webcindario\.com|webobo\.com|host\.sk|sapo\.pt|wanadoo\.es|skyrock\.com|freehostia\.com|tripod\.com)(?:[\/?#:]|$)/
 !Piracy Malware
-||*massgrave.*^$denyallow=massgrave.dev|massgrave.pages.dev|massgrave.visualstudio.com
-||*massgrav.*^
-||*massgraves.*^
+||*massgrav*^$denyallow=massgrave.dev|massgrave.pages.dev|massgrave.visualstudio.com
 ||*microsoftactivationscripts.*^
 ||*kmspico*.*^$denyallow=~forums.mydigitallife.net
 ||*kms-pico*.*^
@@ -129,12 +127,6 @@
 /^(?:www\.)?(?:v1ngr[o0]up|ving9oup|vingr0up)\./
 /^(?:www\.)?νnpt\./
 /^(?:www\.)?(?:v1n[a4]ph[o0]ne|vin4ph[o0]ne|vinaph0ne)\./
-
-# ── PUNYCODE / IDN HOMOGRAPH (Compliant with RFC 3492 base stripping)
-/^(?:www\.)?xn--(?:vittel|vitcombank|tchcombank|vnfast|vnhomes|vpbank|vnamilk|vingrp|inmyxanh)[a-z0-9-]*\./
-
-# ── HIGH-RISK TLD ABUSE
-/^(?:www\.)?(?:viettel|fptshop|vinfast|vinhomes|vingroup|thegioididong|dienmayxanh|vinamilk|masan|vietcombank|techcombank|vpbank|acb|ghn|ghtk|vnpt|vinaphone)\.(?:xyz|top|site|ink|store|online|vip|info)$/
 
 # ── SCAM PATTERN CATCH-ALLS
 /^(?:www\.)?(?:viettel|fpt|vinfast|vinhomes|vingroup|thegioididong|dienmayxanh|vinamilk|masan|vietcombank|techcombank|vpbank|acb|ghn|ghtk|vnpt|vinaphone)[a-z0-9-]{0,3}(?:khuyenmai|uudai|vayvon|tongdai|lapmang|goicuoc|mienphi|dangky)\./
