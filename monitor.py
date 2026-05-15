@@ -28,7 +28,7 @@ import concurrent.futures
 # ---------------------------------------------------------------------------
 # Tunables
 # ---------------------------------------------------------------------------
-MAX_CANDIDATES_PER_BRAND = 500   # hard cap per brand
+MAX_CANDIDATES_PER_BRAND = 4000  # hard cap per brand
 DNS_WORKERS              = 20    # concurrent DNS threads
 DNS_TIMEOUT              = 2.0   # seconds per lookup
 
