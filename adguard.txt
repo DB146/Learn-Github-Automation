@@ -1,8 +1,6 @@
 @@||adguard-dns.io^
 !Bad App
 /(cnet\.com|download\.com|zdnet\.de|softonic\.com|opera\.com|mcafee\.com|mcafeemobilesecurity\.com|mcafeewebadvisor\.com|avast\.com|avg\.com|gendigital\.com|norton\.com|nortonlifelock\.com|avira\.com|ccleaner\.com|ccleanercloud\.com|privateinternetaccess\.com|expressvpn\.com|zenmate\.com|cyberghostvpn\.com|kape\.com|vpnmentor\.com|wizcase\.com)/
-!Made-For-Advertisement
-/(metaqore\.net|modabright\.net|thumpnews\.com|mobileera\.net|futurebyte\.net|tasteezy\.net|flavorvoyage\.net|phonevibe\.net|quantixa\.net)/
 !Regex
 ||/xn--/^
 !Bad Content
