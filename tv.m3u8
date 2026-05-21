@@ -45,12 +45,12 @@ http://line.watchtivo-8k.com:80/play/live.php?mac=00:1A:79:3F:0C:96&stream=94147
 http://line.watchtivo-8k.com:80/play/live.php?mac=00:1A:79:3F:0C:96&stream=941472&extension=ts&play_token=3EM8alU2An
 #EXTINF:-1 group-title="⚽| Thể thao quốc tế" tvg-logo="https://cdn.livesoccertv.com/images/channels/thumbnails/canalplus-live-13.png", CANAL+ LIVE 13
 http://tvgold-max.info:8089/live/8593957586249/9537521949372/85692651.ts
+#EXTINF:-1 group-title="⚽| Thể thao quốc tế" tvg-logo="https://cdn.livesoccertv.com/images/channels/thumbnails/canalplus-live-14.png", CANAL+ LIVE 14
+http://tvgold-max.info:8089/live/8593957586249/9537521949372/85692661.ts
 #EXTINF:-1 group-title="⚽| Thể thao quốc tế" tvg-logo="https://cdn.livesoccertv.com/images/channels/thumbnails/canalplus-live-15.png", CANAL+ LIVE 15
-http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122048&extension=ts&play_token=jR2N0mt5SZ
+http://tvgold-max.info:8089/live/8593957586249/9537521949372/85692650.ts
 #EXTINF:-1 group-title="⚽| Thể thao quốc tế" tvg-logo="https://cdn.livesoccertv.com/images/channels/thumbnails/canalplus-live-16.png", CANAL+ LIVE 16
-http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122050&extension=ts&play_token=pgbrtZxiUM
-#EXTINF:-1 group-title="⚽| Thể thao quốc tế" tvg-logo="https://cdn.livesoccertv.com/images/channels/thumbnails/canalplus-live-17.png", CANAL+ LIVE 17
-http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122052&extension=ts&play_token=o7h6R125hi
+http://tvgold-max.info:8089/live/8593957586249/9537521949372/85692660.ts
 #EXTINF:-1 group-title="⚽| Thể thao quốc tế" tvg-logo="https://cdn.livesoccertv.com/images/channels/thumbnails/canalplus-live-18.png", CANAL+ LIVE 18
 http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1122054&extension=ts&play_token=XPmBZyeTRp
 #EXTINF:-1 group-title="⚽| Thể thao quốc tế" tvg-logo="https://m.media-amazon.com/images/I/611NwkDJjOL.png", MUTV
@@ -141,6 +141,8 @@ https://v7.kkphimplayer7.com/20260504/9JB48ezG/3500kb/hls/index.m3u8
 https://v7.kkphimplayer7.com/20260504/xNE4czZl/3500kb/hls/index.m3u8
 #EXTINF:-1 group-title="LIVE EVENTS 🔴" tvg-logo="https://images.fptplay53.net/media/OTT/VOD/2026/04/30/cuoc-xe-am-phu-fpt-play-1777541165464_Background_origin.jpg", Cuốc Xe Âm Phủ - Tập Cuối
 https://v7.kkphimplayer7.com/20260505/6REaXK8f/3500kb/hls/index.m3u8
+#EXTINF:-1 group-title="LIVE EVENTS 🔴" tvg-logo="https://images.fptplay53.net/media/OTT/VOD/2026/04/29/nha-hai-chu-fpt-play-1777448554178_Landscape.jpg", Nhà Hai Chủ
+https://v7.kkphimplayer7.com/20260505/YnFXHB6A/3500kb/hls/index.m3u8
 #EXTINF:-1 group-title="LIVE EVENTS 🔴" tvg-logo="https://images.fptplay53.net/media/OTT/VOD/2026/01/12/dua-con-cua-than-tuong-phan-3-fpt-play-1768204408459_Background_origin.jpg", Oshi No Ko Phần 3 - Tập 1
 https://rumble.com/hls-vod/72av32/playlist.m3u8
 #EXTINF:-1 group-title="LIVE EVENTS 🔴" tvg-logo="https://images.fptplay53.net/media/OTT/VOD/2026/01/12/dua-con-cua-than-tuong-phan-3-fpt-play-1768204408459_Background_origin.jpg", Oshi No Ko Phần 3 - Tập 2
@@ -282,13 +284,13 @@ https://sgclient.duckdns.org/source/tv360.m3u8?id=188
 #EXTINF:-1 tvg-id="ongolf" group-title="VTVcab" tvg-logo="https://img.lichphatsong.site/logo/on-golf.jpg", On Golf
 https://sgclient.duckdns.org/source/tv360.m3u8?id=169
 #EXTINF:-1 tvg-id="sctv1hd" group-title="SCTV" tvg-logo="https://raw.githubusercontent.com/vuminhthanh12/vuminhthanh12/refs/heads/main/sctv1.png", SCTV1
-https://liveh12.vtvprime.vn/hls/SCTV1/03.m3u8
+https://hoiquan.dpdns.org/VTVGo/?sctv1
 #EXTINF:-1 tvg-id="sctv2hd" group-title="SCTV" tvg-logo="https://raw.githubusercontent.com/vuminhthanh12/vuminhthanh12/refs/heads/main/SCTV2TODAYTV.jpg", SCTV2 - TODAY TV
 https://sgclient.duckdns.org/source/tv360.m3u8?id=201
 #EXTINF:-1 tvg-id="sctv3hd" group-title="SCTV" tvg-logo="https://raw.githubusercontent.com/vuminhthanh12/vuminhthanh12/refs/heads/main/sctv3.png", SCTV3
-https://liveh34.vtvprime.vn/hls/SCTV3/03.m3u8
+https://hoiquan.dpdns.org/VTVGo/?sctv3
 #EXTINF:-1 tvg-id="sctv4hd" group-title="SCTV" tvg-logo="https://raw.githubusercontent.com/vuminhthanh12/vuminhthanh12/refs/heads/main/sctv4.png", SCTV4
-https://liveh12.vtvprime.vn/hls/SCTV4/03.m3u8
+https://hoiquan.dpdns.org/VTVGo/?sctv4
 #EXTINF:-1 tvg-id="sctv6hd" group-title="SCTV" tvg-logo="https://raw.githubusercontent.com/vuminhthanh12/vuminhthanh12/refs/heads/main/sctv6.png" catchup="append" catchup-days="2" catchup-source="https://tshift.fptplay.net/dvr/film360_1000.stream/chunks_dvr_range-${start}-${offset}.m3u8", SCTV6
 https://live.fptplay53.net/epzhd2/film360_vhls.smil/chunklist_b5000000.m3u8
 #EXTINF:-1 tvg-id="sctv7hd" group-title="SCTV" tvg-logo="https://raw.githubusercontent.com/vuminhthanh12/vuminhthanh12/refs/heads/main/sctv7.webp", SCTV7
@@ -571,6 +573,8 @@ https://live.mediatech.vn/live/285acd5e43b501e4c21b0af4e55810625c8/chunklist.m3u
 http://tv.ctvcamau.vn/live/radio/radio.m3u8
 #EXTINF:-1 tvg-id="canthoradio1" group-title="Radio" tvg-logo="https://canthoplus.vn/storage/channels/9b7858d5-ff44-43b3-94ab-e4d66a54f1bd.png", Cần Thơ Radio 1
 https://live.canthotv.vn/live/radio/chunklist_w1780522487.m3u8
+#EXTINF:-1 tvg-id="canthoradio2" group-title="Radio" tvg-logo="https://canthoplus.vn/storage/channels/d18742e3-5735-43ea-9001-77678b4ef751.png", Cần Thơ Radio 2
+https://live.canthotv.vn/live/radiocs2/chunklist_w790093430.m3u8
 #EXTINF:-1 group-title="Radio" tvg-logo="https://www.danangtv.vn/Uploads/Media/Images/101220211598radio.png", Đà Nẵng
 https://live.mediatech.vn/live/2858a998b1c7fbf4522accd5554588ceae3/chunklist.m3u8
 #EXTINF:-1 group-title="Radio" tvg-logo="https://static.wikia.nocookie.net/logos/images/f/f3/Logo_DRT_FM_92%2C4MHz_%26_FM_94%2C7MHz.png/revision/latest/scale-to-width-down/1082?cb=20220613173357&path-prefix=vi", Đắk Lắk
@@ -673,3 +677,5 @@ http://onair2.cdn.tvchosun.com/origin2/_definst_/tvchosun_s3/playlist.m3u8
 https://stream1.freetv.fun/3171fa435d942f1b7fa6ec05780f8def6705a20b23dc5bd6a43be7f63f6dd781.m3u8
 #EXTINF:-1 group-title="🇨🇳| Trung Quốc" tvg-logo="https://pic2.zhimg.com/80/v2-01c9b1cdd4534f653e1bb8102b18a89d_1440w.webp", CCTV8K
 https://epg.pw/stream/51549059a33a0dc4ac8d112ebbe3b1df956d95319a9ee54b6ca449c464893da5.m3u8
+#EXTINF:-1 group-title="🇹🇭| Thái Lan" tvg-logo="https://www.thairath.co.th/assets/tv/img/share_tv.jpg", Thairath TV 32
+http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776225&extension=ts&play_token=TGCPfAlA9v

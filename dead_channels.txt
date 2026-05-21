@@ -30,5 +30,4 @@ h_550/cctv11_logo_by_amazingtoludada3000_dew5uz3-fullview.png?token=eyJ0eXAiOiJK
  CCTV17 | http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221225765/index.m3u8
  PPTV36 | https://cdn6.goprimetime.info/feed/eI5rczhSQpWBcgOtqRLNWw/chpptvhd3/index.m3u8
  MONO 29 | https://cdn6.goprimetime.info/feed/eI5rczhSQpWBcgOtqRLNWw/chmono293/index.m3u8
- Thairath TV 32 | http://ch-4k-top.org:80/play/live.php?mac=00:1A:79:7a:39:a6&stream=1776225&extension=ts&play_token=TGCPfAlA9v
  Ramsey HangMeas Melody UHD | http://abclive.malisresidences.com:1935/hmmel/_definst_/smil:hmmel.smil/playlist.m3u8
