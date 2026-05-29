@@ -1,0 +1,78 @@
+name: Decrypt and Combine DOCX
+
+on:
+  push:
+    branches: [ "main" ] # Triggers on push to main
+  workflow_dispatch:     # Allows you to run this manually from the Actions tab
+
+jobs:
+  process-docx:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Access the repository files
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Install 7zip (handles all types of zip encryption reliably)
+      - name: Install 7zip
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+      # 3. Decrypt and extract the zip file
+      # It uses a GitHub Secret named ZIP_PASSWORD to decrypt docx.zip
+      - name: Decrypt and extract zip file
+        run: |
+          # 'x' extracts with full paths, '-p' passes the password, '-o' sets output dir
+          7z x docx.zip -p"${{ secrets.ZIP_PASSWORD }}" -oextracted_docs
+
+      # 4. Set up Python environment for combining the files
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 5. Install libraries needed to manipulate DOCX files
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-docx docxcompose
+
+      # 6. Run inline Python script to combine all extracted DOCX files
+      - name: Combine DOCX files
+        run: |
+          python -c "
+          import glob
+          from docx import Document
+          from docxcompose.composer import Composer
+
+          # Find all docx files in the extracted folder (including subfolders)
+          files = sorted(glob.glob('extracted_docs/**/*.docx', recursive=True))
+          
+          if not files:
+              print('No .docx files found in the extracted folder.')
+              exit(1)
+
+          print(f'Found {len(files)} files to combine.')
+          
+          # Initialize the composer with the first document
+          master = Document(files[0])
+          composer = Composer(master)
+
+          # Append the remaining documents
+          for file in files[1:]:
+              print(f'Appending {file}...')
+              doc = Document(file)
+              composer.append(doc)
+
+          # Save the final combined document
+          composer.save('combined_output.docx')
+          print('Successfully combined into combined_output.docx')
+          "
+
+      # 7. Upload the combined file so you can download it from GitHub
+      - name: Upload combined DOCX as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-document
+          path: combined_output.docx
+          retention-days: 7
