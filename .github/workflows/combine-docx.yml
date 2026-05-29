@@ -1,38 +1,89 @@
-name: Extract and Combine DOCX
+name: Download, Decrypt & Combine DOCX
 
 on:
-  push:
-    branches: [ "main" ] # Triggers on push to main
-  workflow_dispatch:     # Allows you to run this manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      download_url:
+        description: "Direct download URL for the encrypted zip file (Supports direct links & Google Drive)"
+        required: true
+        type: string
+      zip_password:
+        description: "Zip password (leave blank to use ZIP_PASSWORD repository secret)"
+        required: false
+        type: string
 
 jobs:
   process-docx:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Access the repository files
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # 2. Extract the zip file
-      - name: Extract zip file
+      # 1. Parse URL and Download the ZIP file (Inspired by your example)
+      - name: Download ZIP file
+        id: download
         run: |
-          # Unzips docx.zip into a new directory called 'extracted_docs'
-          unzip docx.zip -d extracted_docs
+          URL="${{ inputs.download_url }}"
+          
+          # Rewrite Google Drive /view URLs to the direct usercontent download endpoint
+          if echo "$URL" | grep -qE "drive\.google\.com/(file/d/|open\?id=)"; then
+            GDRIVE_ID=$(echo "$URL" | grep -oP '(?<=/d/)[^/]+|(?<=id=)[^&]+' | head -1)
+            URL="https://drive.usercontent.google.com/download?id=${GDRIVE_ID}&export=download&authuser=0&confirm=t"
+            echo "Google Drive URL rewritten for ID: ${GDRIVE_ID}"
+          fi
 
-      # 3. Set up Python environment for combining the files
+          echo "Downloading file..."
+          # Robust curl command with retries, timeouts, and a standard User-Agent
+          curl -L --fail --retry 3 --retry-delay 5 \
+               --max-time 600 \
+               -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+               -o "docx.zip" "$URL"
+
+          # Verify the file was downloaded and isn't an HTML error page
+          MIME=$(file --mime-type -b "docx.zip")
+          if [[ "$MIME" == "text/html" ]]; then
+            echo "::error::Downloaded file is an HTML page. The link may be expired, require authentication, or is not a direct download link."
+            exit 1
+          fi
+          
+          SIZE=$(stat -c%s "docx.zip")
+          echo "Successfully downloaded docx.zip ($SIZE bytes)."
+
+      # 2. Install 7zip for reliable decryption
+      - name: Install 7zip
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full
+
+      # 3. Decrypt and extract the zip file
+      - name: Decrypt and extract zip file
+        run: |
+          # Use the input password if provided, otherwise fall back to the GitHub Secret
+          PASSWORD="${{ inputs.zip_password }}"
+          if [ -z "$PASSWORD" ]; then
+            PASSWORD="${{ secrets.ZIP_PASSWORD }}"
+          fi
+          
+          if [ -z "$PASSWORD" ]; then
+            echo "::error::No password provided. Please provide it in the workflow inputs or set a ZIP_PASSWORD repository secret."
+            exit 1
+          fi
+          
+          echo "Extracting archive..."
+          # 'x' extracts with full paths, '-p' passes the password, '-o' sets output dir
+          7z x docx.zip -p"$PASSWORD" -oextracted_docs
+
+      # 4. Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 4. Install libraries needed to manipulate DOCX files
+      # 5. Install libraries needed to manipulate DOCX files
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install python-docx docxcompose
+          python -m pip install --upgrade pip -q
+          pip install python-docx docxcompose -q
 
-      # 5. Run inline Python script to combine all extracted DOCX files
+      # 6. Run inline Python script to combine all extracted DOCX files
       - name: Combine DOCX files
         run: |
           python -c "
@@ -47,7 +98,9 @@ jobs:
               print('No .docx files found in the extracted folder.')
               exit(1)
 
-          print(f'Found {len(files)} files to combine.')
+          print(f'Found {len(files)} files to combine:')
+          for f in files:
+              print(f' - {f}')
           
           # Initialize the composer with the first document
           master = Document(files[0])
@@ -64,7 +117,7 @@ jobs:
           print('Successfully combined into combined_output.docx')
           "
 
-      # 6. Upload the combined file so you can download it from GitHub
+      # 7. Upload the combined file as an artifact
       - name: Upload combined DOCX as artifact
         uses: actions/upload-artifact@v4
         with:
