@@ -1,5 +1,0 @@
-# requirements.txt
-dnspython>=2.4.0
-dnstwist[full]>=20240101
-tldextract>=5.1.0
-requests>=2.31.0
