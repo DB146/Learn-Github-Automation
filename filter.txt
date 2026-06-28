@@ -4,20 +4,9 @@
 /(cnet\.com|download\.com|zdnet\.de|softonic\.com|opera\.com|mcafee\.com|mcafeemobilesecurity\.com|mcafeewebadvisor\.com|avast\.com|avg\.com|gendigital\.com|norton\.com|nortonlifelock\.com|avira\.com|ccleaner\.com|ccleanercloud\.com|privateinternetaccess\.com|expressvpn\.com|zenmate\.com|cyberghostvpn\.com|kape\.com|vpnmentor\.com|wizcase\.com)/
 !Punycode
 ||/xn--/^
-!Bad Content
-/^.*(?:bestgore|seegore|goresee|goregrish|gorecenter|gorecentre|goreforum|goreforums|goredb|gorehub|gorezone|goretube|gorevideo|gorevideos|gorewatch|gorestream|goreplanet|gorebook|gorebay|goredump|goregallery|goremirror|gorenation|goresociety|gorepit|goreportal|goreleak|goreleaks|goreflix|goreground|goresites|deepgore|deepgoretube|livegore|realgore|realitygore|xgore|forogore).*/
-/^.*(?:shockgore|shocksite|shocksites|shockvideo|shockvideos|shocktube|shockmansion|shockchan|shockarchive|shockhub|documentingreality|watchpeopledie|kaotic|hoodsite|ogrish|crazyshit|deadhouse|deathtube|beheadedart|runthegauntlet|damagedcorpse|leakedreality|leakreality).*/
-/^.*(?:goatse|meatspin|lemonparty|tubgirl|painolympics|2girls1cup|1girl1bowl|1girl1pitcher|1priest1nun|kidsin(?:a)?sandbox|jar(?:squatter)?|kekma|offended|takethislollipop).*/
-/^.*(?:behead(?:ing|ed)?|decapitat(?:e|ed|ion)|corpse|cadaver|autopsy|snuff|deadbody|deathvideo|murdervideo|executionvideo|realdeath|fatalcrash).*/
-/^(.*[.-])?gore([.-].*)?$/
-/^(?=.*(?:porn|porno|xxx|xvideos|xnxx|xhamster|pornhub|redtube|youporn|spankbang|hentai|rule34|nsfw|nude|naked|boobs?|tits|pussy|cock|dick|fetish|bdsm|anal|blowjob|vagina|penis|orgasm|slut|whore|escort|sexcam|webcamsex|strip|hardcore|shemale|futanari|erotic|gore|shock|behead|corpse|snuff|kaotic|bestgore|watchpeopledie|hoodsite)).*\.(?:tumblr\.com|blogspot\.com|pages\.dev|canalblog\.com|startspot\.nl|over-blog\.com|skyblog\.com|centerblog\.net|unblog\.fr|jouwpagina\.nl|maakjestart\.nl|startplezier\.nl|startbewijs\.nl|webcindario\.com|allmyblog\.com|genblogger\.com|perfecturl\.com|webobo\.com|blog4ever\.com|startspin\.nl|startclub\.nl|favos\.nl|zoekvinden\.nl|startkabel\.nl|startje\.com|startertjes\.nl|uwstart\.nl|workers\.dev|itch\.io|narod\.ru|atw\.hu|favorietje\.nl|web-log\.nl|blogtrafic\.com)$/
-/^(?!xxxlutz\.)(?:[a-z0-9-]*(?:porn|porno|xxx|xvideos|xnxx|xhamster|hentai|rule34|nsfw|nude|naked|pussy|boobs?|tits|cock|dick|bdsm|fetish|blowjob|shemale|futanari|redtube|youporn|spankbang|pornhub)[a-z0-9-]*)\.(?:com|net|org|info|biz|io|co|tv|to|cc|me|xyz|online|site|live|club|app|fun|tube|video|pics|porn|xxx|sex)$/
-/^(?:[^\/?#.]+\.)*(?:cdn|static|img|image|images|media|video|videos|thumb|thumbs|api|mobile|amp|assets|content|stream|edge)[-.a-z0-9]*(?:porn|xxx|xnxx|xvideos|hentai|rule34|nsfw|tube|sex|gore)[-.a-z0-9]*\.[^.]*$/
-/^.*(?:chaturbate\.com|xhamster\.com|xnxx\.com|xvideos\.com|pornhub\.com|stripchat\.com|bongacams\.com|livejasmin\.com|onlyfans\.com|fansly\.com|redtube\.com|youporn\.com|eporner\.com|tnaflix\.com)$/
-/^(?:[a-z0-9-]*(?:sexe|sexo|sexcam|sexchat|sexshop|sexvideo|sexfilm|erotic|erotik|erotica|escort|escorts|webcam|camgirl|camgirls|camsex|milf|lesbian|lesbians|gayporn|hardcore|amateur|teenporn|anal|bondage|mature|babes|pornstar|freeporn|phonesex|telefonsex|geile|gratis)[a-z0-9-]*)\.(?:com|net|org|info|biz|io|co|tv|to|cc|me|xyz|online|site|live|club|app|fun|tube|video|pics|nl|de|fr|es|it|ru|br|pl|eu|uk)$/
-/^(?:[a-z0-9-]*(?:porn|xxx|xnxx|xvideos|hentai|nude|pussy|cock|bdsm|escort|webcam|camgirl|sexcam|sexe|sexo|erotic|shemale|gore)[a-z0-9-]*)\.(?:free\.fr|online\.fr|voila\.fr|site\.voila\.fr|cjb\.net|webcindario\.com|webobo\.com|host\.sk|sapo\.pt|wanadoo\.es|skyrock\.com|freehostia\.com|tripod\.com)$/
 
 !Piracy Malware
+||*.cfd^
 ||*massgrav*^$denyallow=massgrave.dev|massgrave.pages.dev|massgrave.visualstudio.com
 ||*microsoftactivationscripts.*^
 ||*kmspico*.*^$denyallow=~forums.mydigitallife.net
@@ -38,25 +27,6 @@
 ||*iobit.*^
 ||*thepiratebay.*^$denyallow=thepiratebay.org
 ||*kickasstorrents.*^
-!SEO
-!!Allow
-@@/^(?:[a-z0-9-]+\.)*(?:viettel|fpt(?:play|shop)?|vin(?:fast(?:auto)?|homes|group|aphone|amilk)|vnpt|vietcombank|techcombank|vpbank|acb|thegioididong|tgdd|dienmayxanh|masan(?:group)?|ghn|ghtk)\.(?:com(?:\.vn)?|vn|net(?:\.vn)?|org\.vn|shop)$/
-!!Block
-/^(?:www\.)?(?:viettel|fpt|vin(?:fast|homes|group|pt|aphone|amilk)|vnpt|vietcombank|techcombank|vpbank|acb|thegioididong|tgdd|dienmayxanh|masan|ghn|ghtk)[a-z0-9-]{0,6}(?:khuyenmai|uudai|tongdai|lapmang|goicuoc|tuyendung|mienphi|vay-?von|vayonline|vaynhanh|chinhhang|giare|sale|san-sale|vip|official|dangky|dichvu|hotline|lienhe|sim|goicom|internet|fiber|4g|5g|shopee|lazada|online|store|hanoi|hcm|giam-gia|sim-so|so-dep|cap-quang)\./
-/^(?:www\.)?(?:khuyenmai|uudai|tongdai|lapmang|goicuoc|tuyendung|mienphi|vay-?von|vayonline|vaynhanh|chinhhang|giare|sale|san-sale|vip|official|dangky|dichvu|hotline|lienhe|sim|goicom|internet|fiber|4g|5g|shopee|lazada|online|store|hanoi|hcm|giam-gia|sim-so|so-dep|cap-quang)[a-z0-9-]{0,6}(?:viettel|fpt|vin(?:fast|homes|group|pt|aphone|amilk)|vnpt|vietcombank|techcombank|vpbank|acb|thegioididong|tgdd|dienmayxanh|masan|ghn|ghtk)\./
-
-! --- TYPOS & HOMOGLYPHS ---
-/^(?:www\.)?(?:viette[^l]|viettel{2,}|viettle|veittel|ivttel|viettl|vietell|vietel|viettet|viettelx|xviettel|w[ie]3tt[e3]l|wi[e3]tt[e3]l|νi[e3]tt[e3]l|vi[e3]7t[e3]l|vi[e3]tt3l|1iettel|vl3ttel)\./
-/^(?:www\.)?(?:ffpt|fptt|fp7)\.(?:com|net|vn|xyz|site|top|store|vip|online|info|ink|com\.vn|net\.vn|org\.vn)/
-/^(?:www\.)?(?:vinfaast|vinfats|vinfsast|vimfast|vinfasst|vvinfast|vinfsat|v1nf[a4]st|vinf4st|vinf@st)\./
-/^(?:www\.)?(?:vinhomess|vnhomes|vinhome[^s]|v1nh[o0]mes|vinh0mes)\./
-/^(?:www\.)?(?:vingroupp|winggroup|v1ngr[o0]up|ving9oup|vingr0up)\./
-/^(?:www\.)?(?:vietcombannk|vietcomhank|vietcombak|vietcmbank|vietcombonk|vi3tc0mb4nk|vi[e3]tc[o0]mb[@4]nk|v1etcombank|vi3tcombank|vietc0mbank|vietcomb4nk)\./
-/^(?:www\.)?(?:techcombannk|techcombonk|techcomhank|techcombak|t3chc0mb4nk|t3chcombank|techc0mbank|techcomb4nk)\./
-/^(?:www\.)?(?:vpbannk|vpbonk|vvpbank|v0bank|vp6ank|vpb4nk|vp[@4]nk|v[p][b6][@4]nk)\./
-/^(?:www\.)?(?:vinamiilk|vinamllk|vinami1k|v1n[a4]m[i1]lk|vin4m[i1]lk|vinam1lk)\./
-/^(?:www\.)?(?:vnp7|vvnpt|vn0t|νnpt)\./
-/^(?:www\.)?(?:vinaph0ne|vinaphome|v1n[a4]ph[o0]ne|vin4ph[o0]ne)\./
 
 !Zalo
 /^(.*\.)?((graph|oa|sentry-mini|video)\.zalo\.me|zalo\.(cloud|video)|zmdcdn\.me|fiza\.ai|zagoo\.vn)$/
