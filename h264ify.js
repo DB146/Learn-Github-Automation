@@ -1,2 +1,0 @@
-h264ify.js text/javascript
-(function(){"use strict";const b=["vp9","vp09","av1","av01"],r=t=>"string"==typeof t&&b.some(c=>t.includes(c));const p=HTMLMediaElement.prototype.canPlayType,o=MediaSource.isTypeSupported;HTMLMediaElement.prototype.canPlayType=function(t){return r(t)?"":p.call(this,t)},MediaSource.isTypeSupported=function(t){return r(t)?!1:o.call(this,t)};try{Object.defineProperty(navigator,"mediaCapabilities",{get:()=>void 0})}catch(e){}})();
