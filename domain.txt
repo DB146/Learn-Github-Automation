@@ -326,3 +326,7 @@ social.zalopay.vn
 stc-fin.zdn.vn
 stc-oa.zdn.vn
 zinst-stc.zdn.vn
+
+!Test
+zinstant.zadn.vn
+zchannel-photo-resize.zadn.vn
