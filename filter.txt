@@ -1,56 +1,7 @@
-@@||truyenqqko.com^
-@@||adguard-dns.io^
-!Bad Software
-/(cnet\.com|download\.com|zdnet\.de|softonic\.com|opera\.com|mcafee\.com|mcafeemobilesecurity\.com|mcafeewebadvisor\.com|avast\.com|avg\.com|gendigital\.com|norton\.com|nortonlifelock\.com|avira\.com|ccleaner\.com|ccleanercloud\.com|privateinternetaccess\.com|expressvpn\.com|zenmate\.com|cyberghostvpn\.com|kape\.com|vpnmentor\.com|wizcase\.com)/
-!Punycode
-||/xn--/^
+! FB Disable Reload
+facebook.com##+js(aeld, /blur|focus|afterblur|mousemove|visibilitychange/)
 
-!Piracy Malware
-||*.cfd^
-||*massgrav*^$denyallow=massgrave.dev|massgrave.pages.dev|massgrave.visualstudio.com
-||*microsoftactivationscripts.*^
-||*kmspico*.*^$denyallow=~forums.mydigitallife.net
-||*kms-pico*.*^
-||*kmsauto.*^
-||*kms-auto.*^
-||*kmsmatrix.^
-||*fitgirl*repack*.*^$denyallow=fitgirl-repacks.site
-||*steamunlocked.*^
-||*igg-games.*^
-||*igggames.*^
-||*aimhaven.*^
-||*oceanofgames.*^
-||*crackingpatching.*^
-||*cracked-games.*^
-||*getintopc.com^
-||*softonic.*^
-||*iobit.*^
-||*thepiratebay.*^$denyallow=thepiratebay.org
-||*kickasstorrents.*^
-
-!Zalo
-/^(.*\.)?((graph|oa|sentry-mini|video)\.zalo\.me|zalo\.(cloud|video)|zmdcdn\.me|fiza\.ai|zagoo\.vn)$/
-/^(.*\.)?(miniappstore\.api\.zalo\.me|zinst-stc\.zdn\.vn|stc-fin\.zdn\.vn|stc-oa\.zdn\.vn|stc-sp\.zadn\.vn|stc-zmp\.zadn\.vn|opentracking\.zalopay\.vn|social\.zalopay\.vn|broadcast\.api\.zaloapp\.com|channel-zinstant\.api\.zaloapp\.com|discovery\.api\.zaloapp\.com|universal-zinstant\.api\.zaloapp\.com|zsp\.zaloapp\.com)$/
-!||graph.zalo.me^
-!||miniappstore.api.zalo.me^
-!||oa.zalo.me^
-!||sentry-mini.zalo.me^
-!||video.zalo.me^
-!||zalo.cloud^
-!||zalo.video^
-!||zinst-stc.zdn.vn^
-!||opentracking.zalopay.vn^
-!||social.zalopay.vn^
-!Hiện reminder + recommend zalo vid discovery
-!||broadcast.api.zaloapp.com^
-!||channel-zinstant.api.zaloapp.com^
-!||discovery.api.zaloapp.com^
-!||universal-zinstant.api.zaloapp.com^
-!||zsp.zaloapp.com^
-!||stc-fin.zdn.vn^
-!||stc-oa.zdn.vn^
-!||stc-sp.zadn.vn^
-!||stc-zmp.zadn.vn^
-!||zmdcdn.me^
-!||fiza.ai^
-!||zagoo.vn^
+! YT Disable AV1, VP9
+voutube.com##+js(trusted-replace-argument, MediaSource.isTypeSupported, 0, 0, condition, /vp0?9|av0?1/)
+!!Adguard
+youtube.com#%#//scriptlet('trusted-replace-argument', 'MediaSource.isTypeSupported', '0', '0', '/vp0?9|av0?1/')
