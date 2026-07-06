@@ -5,3 +5,6 @@ facebook.com##+js(aeld, /blur|focus|afterblur|mousemove|visibilitychange/)
 voutube.com##+js(trusted-replace-argument, MediaSource.isTypeSupported, 0, 0, condition, /vp0?9|av0?1/)
 !!Adguard
 youtube.com#%#//scriptlet('trusted-replace-argument', 'MediaSource.isTypeSupported', '0', '0', '/vp0?9|av0?1/')
+!!! Also Disable 60FPS
+youtube.com#%#//scriptlet('trusted-replace-argument', 'MediaSource.isTypeSupported', '0', '0', '/vp0?9|av0?1|framerate=60/')
+
