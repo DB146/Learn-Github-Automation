@@ -221,6 +221,7 @@ z-lib.wiki
 z-library.blog
 z-library.help
 z-library-proxy.com
+
 ! Fake Windows Activators
 activator-kmspico.net
 activators.pro
@@ -308,6 +309,7 @@ revancedapk.net
 vanced.io
 annas-archive.li
 annas-archive.pm
+
 ! This section of the filterlist contains not recommended/potentially unsafe sites and software domains used in the Plus version
 ! Software / App Sites
 cnet.com
