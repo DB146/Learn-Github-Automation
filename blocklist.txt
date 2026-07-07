@@ -1,3 +1,33 @@
+!Zalo
+fiza.ai
+zalo.cloud
+!Hiện reminder + recommend zalo vid discovery
+broadcast.api.zaloapp.com
+channel-zinstant.api.zaloapp.com
+discovery.api.zaloapp.com
+universal-zinstant.api.zaloapp.com
+zsp.zaloapp.com
+graph.zalo.me
+miniappstore.api.zalo.me
+oa.zalo.me
+sentry-mini.zalo.me
+video.zalo.me
+zmdcdn.me
+zalo.video
+res-zalo.zadn.vn
+stc-sp.zadn.vn
+stc-zmp.zadn.vn
+zagoo.vn
+opentracking.zalopay.vn
+social.zalopay.vn
+stc-fin.zdn.vn
+stc-oa.zdn.vn
+zinst-stc.zdn.vn
+
+!Test
+zinstant.zadn.vn
+zchannel-photo-resize.zadn.vn
+
 ! Unsafe game sites
 igg-games.com
 igg-games.cc
@@ -80,6 +110,7 @@ fitgirlrepackz.com
 fitgirl-repacks.theproxy.vip
 fitgirl-repacks.us
 fitgirl-repacks.unb
+
 ! Software / App Sites
 getintopc.com
 getintopc.cc
@@ -127,6 +158,7 @@ freesoft.space
 dekisoft.com
 appdoze.com
 protonge.com
+
 ! Torrent Sites / Clients
 thekickasstorrents.com
 kickass-official.blue
@@ -140,6 +172,7 @@ bitlord.com
 bitlorddl.com
 1377x.to
 www.nyaa.eu
+
 ! Software / Apps
 limewire.com
 downloadlynet.ir
@@ -153,6 +186,10 @@ tlauncher.co.com
 gshade.org
 totalav.com
 pcprotect.com
+apk.watch
+apk.dog
+apkgold-vn.com
+
 ! Fake Zlib Sites
 zlib.is
 z-lib.ai
@@ -301,32 +338,3 @@ kik.com
 360totalsecurity.com
 ipcgames.com
 
-!Zalo
-fiza.ai
-zalo.cloud
-!Hiện reminder + recommend zalo vid discovery
-broadcast.api.zaloapp.com
-channel-zinstant.api.zaloapp.com
-discovery.api.zaloapp.com
-universal-zinstant.api.zaloapp.com
-zsp.zaloapp.com
-graph.zalo.me
-miniappstore.api.zalo.me
-oa.zalo.me
-sentry-mini.zalo.me
-video.zalo.me
-zmdcdn.me
-zalo.video
-res-zalo.zadn.vn
-stc-sp.zadn.vn
-stc-zmp.zadn.vn
-zagoo.vn
-opentracking.zalopay.vn
-social.zalopay.vn
-stc-fin.zdn.vn
-stc-oa.zdn.vn
-zinst-stc.zdn.vn
-
-!Test
-zinstant.zadn.vn
-zchannel-photo-resize.zadn.vn
