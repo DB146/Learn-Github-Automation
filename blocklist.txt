@@ -56,6 +56,7 @@ gamefabrique.com
 gamefabrique.ru
 steamunlocked.net
 game-repack.site
+
 ! Pirate bay proxies And clones
 ! thepiratebay.org
 pirate-bays.net
@@ -83,9 +84,11 @@ thepiratebay1.top
 thepiratebay1.info
 thepiratebay.rocks
 thepiratebay.vet
+
 ! Popup ads on Pirate bay
 wpadmngr.com
 iconcardinal.com
+
 ! Fake Fitgirl repacks sites
 fitgirl-repack.site
 fitgirl-repack.com
@@ -316,6 +319,7 @@ cnet.com
 download.com
 downloads.zdnet.de
 softonic.com
+
 ! Software / Apps
 opera.com
 mcafee.com
@@ -339,4 +343,7 @@ wizcase.com
 kik.com
 360totalsecurity.com
 ipcgames.com
+
+!Fake
+ublockorigin.com
 
