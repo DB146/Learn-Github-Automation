@@ -28,9 +28,9 @@ zinstant.zadn.vn
 zchannel-photo-resize.zadn.vn
 
 !Docln
-!docln.top
 docln.net
 docln.sbs
+docln.top
 hako.vn
 
 
