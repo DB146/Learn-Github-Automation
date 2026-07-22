@@ -28,9 +28,11 @@ zinstant.zadn.vn
 zchannel-photo-resize.zadn.vn
 
 !Docln
-!docln.net
-!docln.sbs
-!hako.vn
+!docln.top
+docln.net
+docln.sbs
+hako.vn
+
 
 ! Unsafe game sites
 igg-games.com
