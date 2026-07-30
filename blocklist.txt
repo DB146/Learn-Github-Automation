@@ -1,3 +1,19 @@
+!Time Wasting
+!!Docln
+docln.net
+docln.sbs
+docln.top
+hako.vn
+!!Ragebait
+x.com
+!!Short
+tiktok.com
+instagram.com
+!!Livestream
+twitch.tv
+!!Other
+patreon.com
+
 !Zalo
 fiza.ai
 zalo.cloud
@@ -26,12 +42,6 @@ zinst-stc.zdn.vn
 !Test
 zinstant.zadn.vn
 zchannel-photo-resize.zadn.vn
-
-!Docln
-docln.net
-docln.sbs
-docln.top
-hako.vn
 
 
 ! Unsafe game sites
