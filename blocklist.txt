@@ -40,8 +40,8 @@ stc-fin.zdn.vn
 stc-oa.zdn.vn
 zinst-stc.zdn.vn
 !Test
-!Liên quan Setting các máy đã login
-!zinstant.zadn.vn
+!zinstant.zadn.vn !Liên quan Setting các máy đã login
+!id.zalo.me !Liên quan đăng nhập trên máy tính
 zchannel-photo-resize.zadn.vn
 
 
