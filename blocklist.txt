@@ -47,7 +47,7 @@ zinst-stc.zdn.vn
 !Test
 !zinstant.zadn.vn !Liên quan Setting các máy đã login
 !id.zalo.me !Liên quan đăng nhập trên máy tính
-!zchannel-photo-resize.zadn.vn !Icon
+zchannel-photo-resize.zadn.vn
 
 
 ! Unsafe game sites
