@@ -1,6 +1,6 @@
 !Time Wasting
 !!Reading
-docln.net
+!docln.net
 docln.sbs
 docln.top
 hako.vn
