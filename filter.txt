@@ -8,6 +8,11 @@ www.reddit.com###answers-suggested-queries
 !Reddit - Search - AI Answer
 www.reddit.com##.search-answers-preview-section
 
+!Docln - Chapter - Banner
+docln.net##.border-l-4.border-yellow-400.bg-yellow-50.p-4
+!Docln - Chapter - Poster
+docln.net##.d-md-none
+
 
 
 
