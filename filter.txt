@@ -1,9 +1,9 @@
 !Title: Annoyance, Distraction,... Filter
 !Reddit - Post - Video - Suggested videos
 www.reddit.com##.w-full.h-full.max-w-3xl.box-border.relative.overflow-hidden.flex.flex-col.items-center.justify-center
-!Reddit - Post - Post Recommend
+!Reddit - Post - Comment - Post Recommend
 www.reddit.com##.border-solid.border-neutral-border-weak.border-x-0.border-t-sm.border-b-0.mt-md.pt-md.mb-0
-!Reddit - Post - People also ask about + View post in
+!Reddit - Post - Comment - People also ask about + View post in
 www.reddit.com###answers-suggested-queries
 !Reddit - Search - AI Answer
 www.reddit.com##.search-answers-preview-section
