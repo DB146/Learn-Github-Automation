@@ -2,7 +2,7 @@
 !Title: Annoyance Filter
 !Expires: 2 days
 !Description: Everything that is annoying will be blocked
-
+!License: MIT
 
 !Reddit - Post - Video - Suggested videos
 reddit.com##.w-full.h-full.max-w-3xl.box-border.relative.overflow-hidden.flex.flex-col.items-center.justify-center
@@ -51,3 +51,174 @@ voutube.com##+js(trusted-replace-argument, MediaSource.isTypeSupported, 0, 0, co
 youtube.com#%#//scriptlet('trusted-replace-argument', 'MediaSource.isTypeSupported', '0', '0', '/vp0?9|av0?1/')
 
 
+
+
+! Credit: https://github.com/BevizLaszlo/UBlock-Filters-for-Social-Media
+! License: MIT
+! ----- YOUTUBE FILTERS -----
+
+! Homepage: https://github.com/gijsdev/ublock-hide-yt-shorts
+
+! desktop
+www.youtube.com##ytd-thumbnail-overlay-time-status-renderer[overlay-style="SHORTS"]:upward(ytd-video-renderer)
+www.youtube.com##:matches-path(/^(?!\/feed\/history).*$/)ytd-reel-shelf-renderer
+www.youtube.com##ytd-rich-shelf-renderer[is-shorts],ytd-rich-shelf-renderer[is-shorts]:upward(ytd-rich-section-renderer)
+www.youtube.com##ytd-rich-item-renderer[rendered-from-rich-grid] ytm-shorts-lockup-view-model:upward(ytd-rich-item-renderer[rendered-from-rich-grid])
+www.youtube.com##ytd-guide-entry-renderer:has(.ytd-guide-entry-renderer[title="Shorts"])
+www.youtube.com##ytd-mini-guide-entry-renderer:has(.ytd-mini-guide-entry-renderer[title="Shorts"])
+www.youtube.com##yt-tab-shape[tab-title="Shorts"]
+www.youtube.com##yt-chip-cloud-chip-renderer:has(.ytChipShapeInactive:has-text(/^Shorts$/i))
+www.youtube.com##ytm-shorts-lockup-view-model-v2:upward(grid-shelf-view-model)
+
+! mobile
+m.youtube.com##ytm-thumbnail-overlay-time-status-renderer[data-style="SHORTS"]:upward(ytm-video-with-context-renderer)
+m.youtube.com##:matches-path(/^(?!\/feed\/history).*$/)ytm-reel-shelf-renderer
+m.youtube.com##ytm-pivot-bar-item-renderer:has(.pivot-shorts)
+m.youtube.com##:matches-path(/^(?!\/feed\/history).*$/)ytm-shorts-lockup-view-model:upward(ytm-rich-section-renderer)
+m.youtube.com##yt-tab-shape[tab-title="Shorts"]
+www.youtube.com##ytm-chip-cloud-chip-renderer:has([aria-label="Shorts"])
+m.youtube.com##ytm-shorts-lockup-view-model:upward(grid-shelf-view-model)
+
+! End of gijsdev/ublock-hide-yt-shorts filter list
+
+www.youtube.com##.ytp-show-tiles.videowall-endscreen.ytp-player-content.html5-endscreen
+www.youtube.com##ytd-browse[page-subtype="home"]
+www.youtube.com###scroll-container > .yt-chip-cloud-renderer.style-scope
+www.youtube.com##ytd-item-section-renderer.ytd-watch-next-secondary-results-renderer.style-scope
+www.youtube.com##div#secondary>div#secondary-inner>div#related
+www.youtube.com##div#primary>div#primary-inner>div#below>div#related
+
+m.youtube.com##div.related-items-container
+m.youtube.com##grid-shelf-view-model:has(ytm-shorts-lockup-view-model)
+m.youtube.com##[section-identifier="related-items"]
+
+
+m.youtube.com##:matches-path(/^\/$/).tab-content
+
+
+! for the new youtube video recommendations:
+www.youtube.com##div.ytp-fullscreen-grid-main-content
+
+! ----- END OF YOUTUBE FILTERS -----
+
+
+
+
+
+! ----- FACEBOOK FILTERS -----
+
+! Removes friend and followed stories from home
+www.facebook.com##.x193iq5w.xgmub6v.x1ceravr.x1v0nzow
+
+! Removes Home feed
+www.facebook.com##.x1hc1fzr.x1unhpq9.x6o7n8i
+
+! Removes Reels, Groups, Events Navigation Buttons
+www.facebook.com##ul.xuk3077.x78zum5.x1iyjqo2.xl56j7k.xe11lzi.x1vy8oqc.x88anuq>li:nth-child(2)
+www.facebook.com##ul.xuk3077.x78zum5.x1iyjqo2.xl56j7k.xe11lzi.x1vy8oqc.x88anuq>li:nth-child(4)
+www.facebook.com##ul.xuk3077.x78zum5.x1iyjqo2.xl56j7k.xe11lzi.x1vy8oqc.x88anuq>li:nth-child(5)
+
+! Removes Reels button from left sidebar
+www.facebook.com##.x1us19tq.x1iyjqo2.xdt5ytf.x78zum5 > .x1iyjqo2 li.x1c1uobl.x18d9i69.xyri2b.xexx8yu.x1lziwak.xat24cr.x14z9mp.xdj266r.html-li:has(span:has-text(/^Reels$/))
+! Removes Reels button from Facebook Menu
+www.facebook.com###_r_7q_ > div.x193iq5w.x2lah0s.xdt5ytf.x78zum5.x9f619.x1ja2u2z.x1n2onr6:has(span:has-text(/^Reels$/))
+
+! mobile version:
+facebook.com##body.Android div#screen-root>div>div>div.m:has(div[aria-label="What's on your mind?"]) ~ *
+facebook.com##body.iOS div#screen-root>div>div>div.m:has(div[aria-label="What's on your mind?"]) ~ *
+
+facebook.com##body.Android div[role="tablist"] div.bg-s3.m:nth-of-type(4)
+facebook.com##body.Android div[role="tablist"] div.bg-s3.m:nth-of-type(6)
+facebook.com##body.iOS div.bg-s3.m:nth-of-type(4)
+facebook.com##body.iOS div.bg-s3.m:nth-of-type(6)
+
+! ----- END OF FACEBOOK FILTERS -----
+
+
+
+
+
+! ----- REDDIT FILTERS -----
+
+www.reddit.com##shreddit-app[pagetype="home"] .main-container
+www.reddit.com##shreddit-app[pagetype="popular"] #subgrid-container
+www.reddit.com##shreddit-app[pagetype="all"] .main-container
+www.reddit.com##shreddit-app[pagetype="explore"] #main-content
+www.reddit.com##shreddit-app[pagetype="news"] #main-content
+
+! Start of Reddit trending dropdown rules
+! LOGGED IN rules
+www.reddit.com###section_0_pipeline_1_trending_query
+www.reddit.com###section_0_pipeline_1_trending_query ~ *
+
+! LOGGED OUT rules
+www.reddit.com###search-dropdown-results-container > div:has(svg[icon-name="trend"])
+www.reddit.com###search-dropdown-results-container > div:has(svg[icon-name="trend"]) ~ *
+! End of Reddit trending dropdown rules
+
+! Remove suggested posts below Reddit posts (right sidebar)
+www.reddit.com##faceplate-tracker[noun="discovery_unit"]
+
+! ----- END OF REDDIT FILTERS -----
+
+
+
+
+
+! ----- TWITCH FILTERS -----
+
+www.twitch.tv##[aria-label="Recommended Channels"]
+www.twitch.tv##[aria-label="Recommended Categories"]
+www.twitch.tv##[aria-label="Live Channels"]
+www.twitch.tv##[aria-label*="Viewers Also Watch"]
+www.twitch.tv##main:has(#front-page-main-content)
+
+! ----- END OF TWITCH FILTERS -----
+
+
+
+
+
+! ----- X FILTERS -----
+
+x.com##[aria-label="Timeline: Your Home Timeline"]
+
+! ----- END OF X FILTERS -----
+
+
+
+
+
+! ----- INSTAGRAM FILTERS -----
+
+! Removes "Suggested for you", "Because you watched [...]" and similar in feed
+www.instagram.com##+js(json-prune, require.0.3.0.__bbox.require.0.3.1.__bbox.result.data.xdt_api__v1__feed__timeline__connection.edges.[-].node.explore_story.media.explore.title data.xdt_api__v1__feed__timeline__connection.edges.[-].node.explore_story.media.explore.title)
+! Removes "Threads" in feed
+www.instagram.com##+js(json-prune, require.0.3.0.__bbox.require.0.3.1.__bbox.result.data.xdt_api__v1__feed__timeline__connection.edges.[-].node.bloks_netego.payload)
+www.instagram.com##+js(json-prune-xhr-response, data.xdt_api__v1__feed__timeline__connection.edges.[-].node.bloks_netego.payload, , propsToMatch, url:/api/graphql)
+! Hides "Threads" hyper-references
+www.instagram.com##a[href="https://www.threads.net/"]
+
+! Removes Reels button in the left navbar on desktop view
+www.instagram.com##.xc26acl.xh8yej3.x1iyjqo2 > div:has(span:has-text(/^Reels$/))
+
+! Removes Reels button on mobile navbar
+www.instagram.com##.xh8yej3.xaw8158.x78zum5 > div > :has(title:has-text(/^Reels$/))
+
+! ----- END OF INSTAGRAM FILTERS -----
+
+
+
+
+
+! ----- LINKEDIN FILTERS -----
+
+www.linkedin.com##main>.feed-sort-toggle-dsa__wrapper
+www.linkedin.com##main:has(.feed-sort-toggle-dsa__wrapper)>.relative
+
+! Web
+linkedin.com##div[data-testid="mainFeed"] > div:not(:first-child)
+! Mobile
+linkedin.com##main > section > ol.feed-container
+
+! ----- END OF LINKEDIN FILTERS -----
