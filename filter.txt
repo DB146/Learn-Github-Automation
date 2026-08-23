@@ -3,15 +3,17 @@
 
 
 !Reddit - Post - Video - Suggested videos
-www.reddit.com##.w-full.h-full.max-w-3xl.box-border.relative.overflow-hidden.flex.flex-col.items-center.justify-center
+reddit.com##.w-full.h-full.max-w-3xl.box-border.relative.overflow-hidden.flex.flex-col.items-center.justify-center
 !Reddit - Post - Comment - Post Recommend
-www.reddit.com##.border-solid.border-neutral-border-weak.border-x-0.border-t-sm.border-b-0.mt-md.pt-md.mb-0
+reddit.com##.border-solid.border-neutral-border-weak.border-x-0.border-t-sm.border-b-0.mt-md.pt-md.mb-0
 !Reddit - Post - Comment - People also ask about + View post in
-www.reddit.com###answers-suggested-queries
+reddit.com###answers-suggested-queries
 !Reddit - Search - AI Answer
-www.reddit.com##.search-answers-preview-section
+reddit.com##.search-answers-preview-section
 !Reddit - Search - People also ask about
-www.reddit.com##.pt-sm
+reddit.com##.pt-sm
+!Reddit - Searchbar - History + Suggestion
+reddit.com###search-dropdown-results-container
 
 ! DOL - Tự học - Banner
 tuhoc.dolenglish.vn##.junior-promotion-banner
