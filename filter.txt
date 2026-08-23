@@ -12,6 +12,15 @@ www.reddit.com##.search-answers-preview-section
 !Reddit - Search - People also ask about
 www.reddit.com##.pt-sm
 
+! DOL - Tự học - Banner
+tuhoc.dolenglish.vn##.junior-promotion-banner
+tuhoc.dolenglish.vn###referral-share-banner
+tuhoc.dolenglish.vn##.section-promotion-expired-short-no
+tuhoc.dolenglish.vn##.lgdJjf
+! DOL - Tự học - Icon
+tuhoc.dolenglish.vn##.LKsR
+tuhoc.dolenglish.vn##.gZqDOM
+
 !Docln - Banner vàng vượt chặn
 docln.net##.border-l-4.border-yellow-400.bg-yellow-50.p-4
 !Docln - Promotion Banner
@@ -20,7 +29,6 @@ docln.net##.index-background.d-lg-none
 docln.net##.d-md-none
 !Docln - Giới thiệu truyện - Recommend
 docln.net##div.col-12.col-lg-9.float-left:nth-of-type(3) > div:nth-of-type(2) > .basic-section.gradual-mobile
-
 !Docln - Home - Bình luận gần đây
 docln.net##div.container:nth-of-type(3) > div.row:nth-of-type(1) > .col-12.col-lg-3
 !Docln - Home - Truyện vừa đăng + Theo dõi nhiều
