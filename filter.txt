@@ -1,4 +1,5 @@
-!Title: Annoyance, Distraction,... Filter
+!Title: Annoyance Filter
+!Description: Everything that is annoying will be blocked
 
 
 !Reddit - Post - Video - Suggested videos
