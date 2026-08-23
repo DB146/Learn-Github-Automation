@@ -10,8 +10,10 @@ www.reddit.com##.search-answers-preview-section
 !Reddit - Search - People also ask about
 www.reddit.com##.pt-sm
 
-!Docln - Chapter - Banner
+!Docln - Yellow Banner Bypass Blocking
 docln.net##.border-l-4.border-yellow-400.bg-yellow-50.p-4
+!Docln - Promotion Banner
+docln.net##.index-background.d-lg-none
 !Docln - Chapter - Poster
 docln.net##.d-md-none
 
