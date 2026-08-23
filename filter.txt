@@ -12,14 +12,14 @@ www.reddit.com##.search-answers-preview-section
 !Reddit - Search - People also ask about
 www.reddit.com##.pt-sm
 
-!Docln - Yellow Banner Bypass Blocking
+!Docln - Banner vàng vượt chặn
 docln.net##.border-l-4.border-yellow-400.bg-yellow-50.p-4
 !Docln - Promotion Banner
 docln.net##.index-background.d-lg-none
-!Docln - Chapter - Poster
+!Docln - Chapter - Recommend
 docln.net##.d-md-none
-
-
+!Docln - Giới thiệu truyện - Recommend
+docln.net##div.col-12.col-lg-9.float-left:nth-of-type(3) > div:nth-of-type(2) > .basic-section.gradual-mobile
 
 
 ! FB Disable Reload
