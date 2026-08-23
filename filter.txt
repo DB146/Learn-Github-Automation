@@ -1,4 +1,6 @@
+[Adblock Plus 2.0]
 !Title: Annoyance Filter
+!Expires: 2 days
 !Description: Everything that is annoying will be blocked
 
 
