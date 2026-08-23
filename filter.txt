@@ -7,6 +7,8 @@ www.reddit.com##.border-solid.border-neutral-border-weak.border-x-0.border-t-sm.
 www.reddit.com###answers-suggested-queries
 !Reddit - Search - AI Answer
 www.reddit.com##.search-answers-preview-section
+!Reddit - Search - People also ask about
+www.reddit.com##.pt-sm
 
 !Docln - Chapter - Banner
 docln.net##.border-l-4.border-yellow-400.bg-yellow-50.p-4
