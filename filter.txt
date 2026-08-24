@@ -17,10 +17,16 @@ reddit.com##.pt-sm
 !Reddit - Searchbar - History + Suggestion
 reddit.com###search-dropdown-results-container
 
-! Zenlishtoeic.vn
+! Learn-C - Sponsor
+learn-c.org##[href^="https://link.coddy.tech/bvMS"]
+
+! Zenlish -  Widget
 zenlishtoeic.vn###lbk-fc
+! Zenlish - Self Advertisement
+zenlishtoeic.vn##.large-3.small-12.medium-12.col
+! Zenlish - Notification
 zenlishtoeic.vn##.zenlish_thong-bao
-zenlishtoeic.vn##.large-3
+! Zenlish - Survey + Q&A
 zenlishtoeic.vn##.footer-wrapper
 
 ! YT Mobile - Dark Shadow over the controller
