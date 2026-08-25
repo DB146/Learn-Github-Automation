@@ -4,7 +4,7 @@
 !License: MIT
 !Homepage: https://github.com/DB146/Learn-Github-Automation
 
-!Reddit - App
+!Reddit - Softblock
 www.reddit.com###configured-xpromo-mweb3x_feeds_blocking_xpromo_lo_fullscreen
 !Reddit - Post - Video - Suggested videos
 reddit.com##.w-full.h-full.max-w-3xl.box-border.relative.overflow-hidden.flex.flex-col.items-center.justify-center
@@ -45,17 +45,22 @@ tuhoc.dolenglish.vn##.gZqDOM
 
 !Docln - Banner vàng vượt chặn
 docln.net##.border-l-4.border-yellow-400.bg-yellow-50.p-4
-!Docln - Promotion Banner
+!Docln - Banner promote truyện
 docln.net##.index-background.d-lg-none
-!Docln - Chapter - Recommend
+!Docln - Chapter - Recommend truyện tương tự
 docln.net##.d-md-none
 !Docln - Chapter - Shopee
 docln.net##.pt-6.mb-6.mx-auto.max-w-4xl
 !Docln - Giới thiệu truyện - Recommend
 docln.net##div.col-12.col-lg-9.float-left:nth-of-type(3) > div:nth-of-type(2) > .basic-section.gradual-mobile
 !Docln - Thanh tìm kiếm
+docln.net###navbar
 docln.net##.page-top-group
-!Docln - Home - Xem thêm
+!Docln - Home - Q&A
+docln.net##.no-push.col-12.push-2-l.col-8-l
+!Docln - Home - Thảo luận
+docln.net##.last-topics
+!Docln - Home - Xem thêm các mục
 docln.net##.see-more
 !Docln - Home - Top
 docln.net###mainpart > div.container:nth-of-type(1) > div.row:nth-of-type(2) > .col-12.col-lg-9
