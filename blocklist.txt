@@ -9,8 +9,8 @@ wattpad.com
 !!Scrolling
 x.com
 threads.com
-!reddit.com
-!facebook.com
+reddit.com
+facebook.com
 
 !!Short
 tiktok.com
