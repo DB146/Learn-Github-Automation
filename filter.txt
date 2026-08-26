@@ -1,5 +1,5 @@
 !Title: Annoyance Filter
-!Expires: 2 days
+!Expires: 1 days
 !Description: Everything that is annoying will be blocked
 !License: MIT
 !Homepage: https://github.com/DB146/Learn-Github-Automation
