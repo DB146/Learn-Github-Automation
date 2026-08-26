@@ -18,6 +18,10 @@ reddit.com##.search-answers-preview-section
 reddit.com##.pt-sm
 !Reddit - Searchbar - History + Suggestion
 reddit.com###search-dropdown-results-container
+!Reddit - NSFW
+reddit.com##[nsfw=""]
+reddit.com##:has(.shreddit-subreddit-icon__icon.text-category-nsfw) #subgrid-container
+
 
 ! Learn-C - Sponsor
 learn-c.org##[href^="https://link.coddy.tech/bvMS"]
