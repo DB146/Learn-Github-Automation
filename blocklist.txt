@@ -11,15 +11,14 @@ x.com
 threads.com
 reddit.com
 facebook.com
+voz.vn
 
 !!Short
 tiktok.com
 instagram.com
 
-!!Livestream
+!!Video
 twitch.tv
-
-!!Other
 patreon.com
 
 !Zalo
