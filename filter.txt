@@ -47,6 +47,19 @@ tuhoc.dolenglish.vn##.lgdJjf
 tuhoc.dolenglish.vn##.LKsR
 tuhoc.dolenglish.vn##.gZqDOM
 
+! Study4 - Widget
+study4.com##.site-elevator
+
+! Estudyme - Widget
+estudyme.com##.css-13e44u9
+! Estudyme - Notice
+estudyme.com##.getpro-purchase-notice-container
+! Estudyme - Anti-Adblock
+estudyme.com###adblock-detected-dialog
+estudyme.com##.MuiDialog-root.MuiModal-root
+! Estudyme - Self-promotion
+estudyme.com##.flex-c.study-getpro-banner-container
+
 !Docln - Banner vàng vượt chặn
 docln.net##.border-l-4.border-yellow-400.bg-yellow-50.p-4
 !Docln - Banner promote truyện
