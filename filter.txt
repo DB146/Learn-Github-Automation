@@ -21,7 +21,29 @@ reddit.com###search-dropdown-results-container
 !Reddit - NSFW
 reddit.com##[nsfw=""]
 reddit.com##:has(.shreddit-subreddit-icon__icon.text-category-nsfw) #subgrid-container
+! Reddit - Anti Auto-translate
+||reddit.com^$removeparam=tl
+! Reddit - Search - Section
+www.reddit.com##.justify-between.items-center.flex-wrap.flex.pt-md
+! Reddit - Search - Profile + Communities
+www.reddit.com##.my-md.p-md.h-min.bg-neutral-background-weak.rounded-4
 
+! Leetcode - AI Button Highlight Code
+leetcode.com##.shadow-md.bg-sd-popover.border-sd-border.border.rounded-sd-md.flex.z-50
+! Leetcode - AI Button
+leetcode.com##.ai-agent-guide.overflow-visible
+! Leetcode - Debugger
+leetcode.com##.rounded-none.cursor-pointer.opacity-50
+! Leetcode - Subscribe Button
+leetcode.com##[href^="/subscribe/"]
+! Leetcode - Student Promotion Button
+leetcode.com##.bts-bar-container
+! Leetcode - Hide Difficulty
+leetcode.com##.text-sd-easy
+leetcode.com##.text-sd-medium
+leetcode.com##.text-sd-hard
+! Leetcode - Spoiler Bar
+leetcode.com##.py-5.px-4.overflow-y-auto.gap-4.flex-col.flex-1.w-full.flex > .gap-1.flex
 
 ! Learn-C - Sponsor
 learn-c.org##[href^="https://link.coddy.tech/bvMS"]
@@ -37,15 +59,21 @@ zenlishtoeic.vn##.footer-wrapper
 
 ! YT Mobile - Dark Shadow over the controller
 m.youtube.com##.player-controls-background-container
+! Youtube - Search - Suggestion
+m.youtube.com##.yt-searchbox-suggestions-container
+! Youtube - Control - Prev/Next Button
+m.youtube.com##.player-middle-controls-prev-next-button.icon-button
 
 ! DOL - Tự học - Banner
 tuhoc.dolenglish.vn##.junior-promotion-banner
 tuhoc.dolenglish.vn###referral-share-banner
 tuhoc.dolenglish.vn##.section-promotion-expired-short-no
 tuhoc.dolenglish.vn##.lgdJjf
-! DOL - Tự học - Icon
-tuhoc.dolenglish.vn##.LKsR
-tuhoc.dolenglish.vn##.gZqDOM
+! DOL - Widget - Book
+tuhoc.dolenglish.vn##[class*="FABLandingHome__Container"]
+! DOL - Widget - Contact
+tuhoc.dolenglish.vn##[class*="ContactDol__Container"]
+
 
 ! Study4 - Widget
 study4.com##.site-elevator
@@ -99,7 +127,8 @@ docln.net##.index-section.thumb-section-flow.last-chapter.original.one-row
 docln.net##.bottom-part.at-index
 !Docln - Home - Truyện đã hoàn thành
 docln.net##.container.pad-top-40
-
+! Docln - Home - Random Recommendation
+docln.net##.rounded-lg.overflow-hidden.mb-8.index-section
 
 ! FB Disable Reload
 facebook.com##+js(aeld, /blur|focus|afterblur|mousemove|visibilitychange/)
