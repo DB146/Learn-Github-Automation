@@ -4,6 +4,7 @@
 !Time Wasting
 !!Newspaper
 baomoi.com
+bmcdn.com
 
 !!Reading
 docln.net
