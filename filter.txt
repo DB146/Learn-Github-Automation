@@ -138,7 +138,12 @@ voutube.com##+js(trusted-replace-argument, MediaSource.isTypeSupported, 0, 0, co
 !!Adguard
 youtube.com#%#//scriptlet('trusted-replace-argument', 'MediaSource.isTypeSupported', '0', '0', '/vp0?9|av0?1/')
 
-
+! Fullblock
+docln.net##body
+docln.com##body
+docln.sbs##body
+hako.vn##body
+facebook.com##body
 
 
 ! Credit: https://github.com/BevizLaszlo/UBlock-Filters-for-Social-Media
