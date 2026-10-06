@@ -1,8 +1,10 @@
-!Title: Annoyance Filter
+!Title: Filter
 !Expires: 1 days
-!Description: Everything that is annoying will be blocked
+!Description: Ads, Tracker, Redirect Ads, Annoying BS, will be blocked
 !License: MIT
 !Homepage: https://github.com/DB146/Learn-Github-Automation
+
+flasharch.com###aswift_3
 
 !Reddit - Softblock
 www.reddit.com###configured-xpromo-mweb3x_feeds_blocking_xpromo_lo_fullscreen
@@ -75,7 +77,6 @@ tuhoc.dolenglish.vn##.lgdJjf
 tuhoc.dolenglish.vn##[class*="FABLandingHome__Container"]
 ! DOL - Widget - Contact
 tuhoc.dolenglish.vn##[class*="ContactDol__Container"]
-
 
 ! Study4 - Widget
 study4.com##.site-elevator
