@@ -1,4 +1,7 @@
 !Title: Blocklist
+!Expires: 1 day
+
+
 !Time Wasting
 !!Newspaper
 baomoi.com
