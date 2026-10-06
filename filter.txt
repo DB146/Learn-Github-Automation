@@ -63,6 +63,8 @@ m.youtube.com##.player-controls-background-container
 m.youtube.com##.yt-searchbox-suggestions-container
 ! Youtube - Control - Prev/Next Button
 m.youtube.com##.player-middle-controls-prev-next-button.icon-button
+! YT - Subscription - Shorts
+m.youtube.com##ytm-rich-section-renderer
 
 ! DOL - Tự học - Banner
 tuhoc.dolenglish.vn##.junior-promotion-banner
