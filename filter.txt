@@ -80,16 +80,6 @@ tuhoc.dolenglish.vn##[class*="ContactDol__Container"]
 ! Study4 - Widget
 study4.com##.site-elevator
 
-! Estudyme - Widget
-estudyme.com##.css-13e44u9
-! Estudyme - Notice
-estudyme.com##.getpro-purchase-notice-container
-! Estudyme - Anti-Adblock
-estudyme.com###adblock-detected-dialog
-estudyme.com##.MuiDialog-root.MuiModal-root
-! Estudyme - Self-promotion
-estudyme.com##.flex-c.study-getpro-banner-container
-
 !Docln - Banner vàng vượt chặn
 docln.net##.border-l-4.border-yellow-400.bg-yellow-50.p-4
 !Docln - Banner promote truyện
@@ -139,42 +129,49 @@ docln.sbs##body
 hako.vn##body
 facebook.com##body
 
+! Credit: https://github.com/0xMH/ublock-youtube-shorts
+! License: MIT
 
-! FB Disable Reload
-facebook.com##+js(aeld, /blur|focus|afterblur|mousemove|visibilitychange/)
+! YouTube - hide all Shorts (shelves, cards, sidebar, tabs, chips)
+youtube.com##ytd-rich-shelf-renderer[is-shorts]
+youtube.com##ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts])
+youtube.com##ytd-reel-shelf-renderer
+youtube.com##ytd-item-section-renderer:has(ytd-reel-shelf-renderer)
+youtube.com##ytd-video-renderer:has(a[href^="/shorts/"])
+youtube.com##ytd-grid-video-renderer:has(a[href^="/shorts/"])
+youtube.com##ytd-rich-item-renderer:has(a[href^="/shorts/"])
+youtube.com##ytm-shorts-lockup-view-model
+youtube.com##ytm-shorts-lockup-view-model-v2
+youtube.com##ytd-reel-item-renderer
+youtube.com##ytd-guide-entry-renderer:has(a[title="Shorts"])
+youtube.com##ytd-mini-guide-entry-renderer[aria-label="Shorts"]
+youtube.com##ytd-pivot-bar-item-renderer:has([tab-title="Shorts"])
+youtube.com##yt-tab-shape[tab-title="Shorts"]
+youtube.com##yt-chip-cloud-chip-renderer:has(yt-formatted-string[title="Shorts"])
+youtube.com##yt-chip-cloud-chip-renderer:has-text(/^\s*Shorts\s*$/)
+youtube.com##grid-shelf-view-model:has(ytm-shorts-lockup-view-model)
+youtube.com##grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2)
 
-! YT Disable AV1, VP9
-voutube.com##+js(trusted-replace-argument, MediaSource.isTypeSupported, 0, 0, condition, /vp0?9|av0?1/)
-!!Adguard
-youtube.com#%#//scriptlet('trusted-replace-argument', 'MediaSource.isTypeSupported', '0', '0', '/vp0?9|av0?1/')
+! Catch Shorts disguised as regular videos via the SHORTS thumbnail badge
+youtube.com##ytd-video-renderer:has([overlay-style="SHORTS"])
+youtube.com##ytd-rich-item-renderer:has([overlay-style="SHORTS"])
+youtube.com##ytd-grid-video-renderer:has([overlay-style="SHORTS"])
+youtube.com##ytd-compact-video-renderer:has([overlay-style="SHORTS"])
+
+! Mobile-DOM surfaces (ytm-*). Scoped to all subdomains because YouTube
+! serves the mobile DOM at www.youtube.com for Android Firefox UAs too.
+youtube.com##ytm-pivot-bar-item-renderer:has(.pivot-shorts)
+youtube.com##ytm-reel-shelf-renderer
+youtube.com##ytm-rich-section-renderer:has(ytm-shorts-lockup-view-model)
+youtube.com##ytm-chip-cloud-chip-renderer:has(.yt-core-attributed-string:has-text(/^Shorts$/i))
+youtube.com##ytm-video-with-context-renderer:has([data-style="SHORTS"])
+
 
 ! Credit: https://github.com/BevizLaszlo/UBlock-Filters-for-Social-Media
 ! License: MIT
 ! ----- YOUTUBE FILTERS -----
 
 ! Homepage: https://github.com/gijsdev/ublock-hide-yt-shorts
-
-! desktop
-www.youtube.com##ytd-thumbnail-overlay-time-status-renderer[overlay-style="SHORTS"]:upward(ytd-video-renderer)
-www.youtube.com##:matches-path(/^(?!\/feed\/history).*$/)ytd-reel-shelf-renderer
-www.youtube.com##ytd-rich-shelf-renderer[is-shorts],ytd-rich-shelf-renderer[is-shorts]:upward(ytd-rich-section-renderer)
-www.youtube.com##ytd-rich-item-renderer[rendered-from-rich-grid] ytm-shorts-lockup-view-model:upward(ytd-rich-item-renderer[rendered-from-rich-grid])
-www.youtube.com##ytd-guide-entry-renderer:has(.ytd-guide-entry-renderer[title="Shorts"])
-www.youtube.com##ytd-mini-guide-entry-renderer:has(.ytd-mini-guide-entry-renderer[title="Shorts"])
-www.youtube.com##yt-tab-shape[tab-title="Shorts"]
-www.youtube.com##yt-chip-cloud-chip-renderer:has(.ytChipShapeInactive:has-text(/^Shorts$/i))
-www.youtube.com##ytm-shorts-lockup-view-model-v2:upward(grid-shelf-view-model)
-
-! mobile
-m.youtube.com##ytm-thumbnail-overlay-time-status-renderer[data-style="SHORTS"]:upward(ytm-video-with-context-renderer)
-m.youtube.com##:matches-path(/^(?!\/feed\/history).*$/)ytm-reel-shelf-renderer
-m.youtube.com##ytm-pivot-bar-item-renderer:has(.pivot-shorts)
-m.youtube.com##:matches-path(/^(?!\/feed\/history).*$/)ytm-shorts-lockup-view-model:upward(ytm-rich-section-renderer)
-m.youtube.com##yt-tab-shape[tab-title="Shorts"]
-www.youtube.com##ytm-chip-cloud-chip-renderer:has([aria-label="Shorts"])
-m.youtube.com##ytm-shorts-lockup-view-model:upward(grid-shelf-view-model)
-
-! End of gijsdev/ublock-hide-yt-shorts filter list
 
 www.youtube.com##.ytp-show-tiles.videowall-endscreen.ytp-player-content.html5-endscreen
 www.youtube.com##ytd-browse[page-subtype="home"]
