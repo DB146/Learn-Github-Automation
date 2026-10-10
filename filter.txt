@@ -124,7 +124,6 @@ docln.net##.container.pad-top-40
 docln.net##.rounded-lg.overflow-hidden.mb-8.index-section
 
 !Fullblock
-docln.net##body
 docln.com##body
 docln.sbs##body
 hako.vn##body
