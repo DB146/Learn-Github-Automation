@@ -1,6 +1,10 @@
 !Title: Blocklist
 !Expires: 1 day
 
+!Allow
+@@adguard-dns.io
+@@reddit.com
+@@google.com
 
 !Time Wasting
 !!Newspaper
