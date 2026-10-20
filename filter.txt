@@ -23,6 +23,10 @@ reddit.com###search-dropdown-results-container
 !Reddit - NSFW
 reddit.com##[nsfw=""]
 reddit.com##:has(.shreddit-subreddit-icon__icon.text-category-nsfw) #subgrid-container
+reddit.com##+js(trusted-set-cookie, search_over18, ON, 1year)
+reddit.com##+js(trusted-set-cookie, over18, false, 1year)
+reddit.com##.items-center.justify-between.flex:has(.text-category-nsfw)
+
 ! Reddit - Anti Auto-translate
 ||reddit.com^$removeparam=tl
 ! Reddit - Search - Section
