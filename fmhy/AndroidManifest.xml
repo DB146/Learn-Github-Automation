@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Required for Android 11+ to query and launch SmartTube and FPT Play -->
+    <queries>
+        <package android:name="com.liskovsoft.smarttubetv.beta" />
+        <!-- Alternative SmartTube package: com.liskovsoft.smarttube -->
+        <package android:name="com.fpt.play.tv" />
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="TV Voice"
+        android:supportsRTL="true"
+        android:theme="@style/Theme.AppCompat.NoActionBar">
+
+        <activity
+            android:name=".VoiceAssistantActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Allows mapping to TV remote assistant buttons if supported -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>
