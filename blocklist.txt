@@ -5,6 +5,9 @@
 @@adguard-dns.io
 @@reddit.com
 @@google.com
+@@assets-proxy.anthropic.com
+
+
 
 !Time Wasting
 !!Newspaper
