@@ -3,7 +3,7 @@
 
 !Allow
 @@adguard-dns.io
-@@reddit.com
+!reddit.com
 @@google.com
 @@assets-proxy.anthropic.com
 
@@ -24,7 +24,7 @@ wattpad.com
 !!Scrolling
 x.com
 threads.com
-facebook.com
+!facebook.com
 voz.vn
 
 !!Short
