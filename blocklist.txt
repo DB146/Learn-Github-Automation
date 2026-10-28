@@ -3,9 +3,13 @@
 
 !Allow
 @@adguard-dns.io
-!reddit.com
 @@google.com
 @@assets-proxy.anthropic.com
+
+
+
+
+
 
 
 
@@ -24,6 +28,7 @@ wattpad.com
 !!Scrolling
 x.com
 threads.com
+!reddit.com
 !facebook.com
 voz.vn
 
@@ -34,6 +39,11 @@ instagram.com
 !!Video
 twitch.tv
 patreon.com
+bigolive.tv
+bigo.tv
+bigovideo.tv
+bigo.sg
+
 
 !Wall Of Shame
 fandom.com
