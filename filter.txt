@@ -33,6 +33,10 @@ reddit.com##.items-center.justify-between.flex:has(.text-category-nsfw)
 www.reddit.com##.justify-between.items-center.flex-wrap.flex.pt-md
 ! Reddit - Search - Profile + Communities
 www.reddit.com##.my-md.p-md.h-min.bg-neutral-background-weak.rounded-4
+! Reddit - Comment - Show More
+www.reddit.com##button[rpl][type][actioned]
+
+
 
 ! Leetcode - AI Button Highlight Code
 leetcode.com##.shadow-md.bg-sd-popover.border-sd-border.border.rounded-sd-md.flex.z-50
@@ -128,11 +132,11 @@ docln.net##.container.pad-top-40
 docln.net##.rounded-lg.overflow-hidden.mb-8.index-section
 
 !Fullblock
-docln.net##body
+!docln.net##body
 docln.com##body
 docln.sbs##body
 hako.vn##body
-facebook.com##body
+!facebook.com##body
 
 ! Credit: https://github.com/0xMH/ublock-youtube-shorts
 ! License: MIT
