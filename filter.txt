@@ -131,6 +131,12 @@ docln.net##.container.pad-top-40
 ! Docln - Home - Random Recommendation
 docln.net##.rounded-lg.overflow-hidden.mb-8.index-section
 
+!Facebook - Open App
+m.facebook.com##div.m.fixed-container.bottom
+!Facebook - Search Suggestion
+m.facebook.com##div.m.ta-suggestion
+
+
 !Fullblock
 !docln.net##body
 docln.com##body
