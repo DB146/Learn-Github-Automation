@@ -23,8 +23,8 @@ reddit.com###search-dropdown-results-container
 !Reddit - NSFW
 reddit.com##[nsfw=""]
 reddit.com##:has(.shreddit-subreddit-icon__icon.text-category-nsfw) #subgrid-container
-reddit.com##+js(set-cookie, search_over18, on)
-reddit.com##+js(set-cookie, over18, false)
+reddit.com##+js(set-cookie-reload, search_over18, on)
+reddit.com##+js(set-cookie-reload, over18, false)
 reddit.com##.items-center.justify-between.flex:has(.text-category-nsfw)
 
 ! Reddit - Anti Auto-translate
