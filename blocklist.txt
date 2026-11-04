@@ -5,10 +5,6 @@
 @@adguard-dns.io
 @@assets-proxy.anthropic.com
 
-||google.com^$badfilter
-google.com^$badfilter
-
-
 !Time Wasting
 !!Newspaper
 baomoi.com
