@@ -3,8 +3,11 @@
 
 !Allow
 @@adguard-dns.io
-@@google.com
 @@assets-proxy.anthropic.com
+
+||google.com^$badfilter
+google.com^$badfilter
+
 
 !Time Wasting
 !!Newspaper
