@@ -3,7 +3,6 @@
 
 !Allow
 @@adguard-dns.io
-@@assets-proxy.anthropic.com
 
 !Time Wasting
 !!Newspaper
@@ -11,7 +10,7 @@ baomoi.com
 bmcdn.com
 
 !!Reading
-!docln.net
+docln.net
 docln.sbs
 docln.top
 hako.vn
@@ -20,7 +19,7 @@ wattpad.com
 !!Scrolling
 x.com
 threads.com
-!reddit.com
+reddit.com
 !facebook.com
 voz.vn
 
