@@ -115,7 +115,7 @@ docln.net##.no-push.col-12.push-2-l.col-8-l
 !Docln - Home - Thảo luận
 docln.net##.last-topics
 !Docln - Home - Xem thêm các mục
-docln.net##.see-more
+!docln.net##.see-more
 !Docln - Home - Top
 docln.net###mainpart > div.container:nth-of-type(1) > div.row:nth-of-type(2) > .col-12.col-lg-9
 !Docln - Home - Bình luận gần đây
