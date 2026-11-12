@@ -5,9 +5,8 @@
 !Homepage: https://github.com/DB146/Learn-Github-Automation
 
 flasharch.com###aswift_3
+www.reddit.com##ad-event-tracker.relative.block
 
-!Reddit - Softblock
-www.reddit.com##[id*=configured-xpromo-mweb3x]
 !Reddit - Post - Video - Suggested videos
 reddit.com##.w-full.h-full.max-w-3xl.box-border.relative.overflow-hidden.flex.flex-col.items-center.justify-center
 !Reddit - Post - Comment - Post Recommend
@@ -26,7 +25,6 @@ reddit.com##:has(.shreddit-subreddit-icon__icon.text-category-nsfw) #subgrid-con
 reddit.com##+js(set-cookie, search_over18, on)
 reddit.com##+js(set-cookie, over18, false)
 reddit.com##.items-center.justify-between.flex:has(.text-category-nsfw)
-
 ! Reddit - Anti Auto-translate
 ||reddit.com^$removeparam=tl
 ! Reddit - Search - Section
@@ -80,7 +78,7 @@ m.youtube.com##ytm-rich-section-renderer
 tuhoc.dolenglish.vn##.junior-promotion-banner
 tuhoc.dolenglish.vn###referral-share-banner
 tuhoc.dolenglish.vn##.section-promotion-expired-short-no
-tuhoc.dolenglish.vn##.lgdJjf
+
 ! DOL - Widget - Book
 tuhoc.dolenglish.vn##[class*="FABLandingHome__Container"]
 ! DOL - Widget - Contact
@@ -108,8 +106,8 @@ docln.net###rd-sidebar
 !Docln - Comment - Chuyển trang
 docln.net##.pagination-footer
 !Docln - Thanh tìm kiếm
-docln.net###navbar
-docln.net##.page-top-group
+!docln.net###navbar
+!docln.net##.page-top-group
 !Docln - Home - Q&A
 docln.net##.no-push.col-12.push-2-l.col-8-l
 !Docln - Home - Thảo luận
@@ -131,18 +129,13 @@ docln.net##.container.pad-top-40
 ! Docln - Home - Random Recommendation
 docln.net##.rounded-lg.overflow-hidden.mb-8.index-section
 
-!Facebook - Open App
-m.facebook.com##div.m.fixed-container.bottom
-!Facebook - Search Suggestion
-m.facebook.com##div.m.ta-suggestion
-
 
 !Fullblock
 !docln.net##body
 docln.com##body
 docln.sbs##body
 hako.vn##body
-!facebook.com##body
+
 
 ! Credit: https://github.com/0xMH/ublock-youtube-shorts
 ! License: MIT
