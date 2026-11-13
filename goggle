@@ -2,14 +2,14 @@
 ! description: Block mindless, money-farming newspaper
 ! author: Custom
 
-! === 1. BOOST ===
+! === BOOST ===
 $boost=2,site=github.com
 $boost=2,site=wikipedia.com
 $boost=2,site=stackoverflow.com
 $boost=2,site=reddit.com
 
 $discard,site=fandom.com
-! === 2. VIỆT NAM (Báo trung ương, địa phương, ngành, tài chính, chứng khoán, giải trí, thể thao & content farms) ===
+
 $discard,site=vnexpress.net
 $discard,site=e.vnexpress.net
 $discard,site=tuoitre.vn
@@ -160,7 +160,8 @@ $discard,site=hoanghamobile.com/tin-tuc
 $discard,site=vnreview.vn
 $discard,site=nghenhinvietnam.vn
 
-! === 3. QUỐC TẾ (Báo chí, tài chính, công nghệ, giải trí, thể thao lớn & content aggregators toàn cầu) ===
+
+
 $discard,site=cnn.com
 $discard,site=bbc.com
 $discard,site=bbc.co.uk
