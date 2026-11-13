@@ -1,16 +1,16 @@
-! name: Ultimate Clean Search & Copycats Removal
+! name: Block Newspaper, Bad MFA site
 ! description: Boost github, reddit, stackoverflow, wikipedia. Discard VN and International news, fandom, and massive code/github copycat translation sites.
+! Public: True
 ! author: Custom
 
 ! === 1. BOOST ===
-$boost=4,site=github.com
-$boost=4,site=stackoverflow.com
-$boost=4,site=reddit.com
-$boost=4,site=wikipedia.org
+$boost=1,site=github.com
+$boost=1,site=stackoverflow.com
+$boost=1,site=reddit.com
+$boost=1,site=wikipedia.org
 
-! === 2. VIỆT NAM (Báo chí, tài chính, chứng khoán, giải trí, thể thao & content farms) ===
+! === 2. Vietnam ===
 $discard,site=vnexpress.net
-$discard,site=e.vnexpress.net
 $discard,site=tuoitre.vn
 $discard,site=thanhnien.vn
 $discard,site=dantri.com.vn
@@ -152,14 +152,14 @@ $discard,site=bongda24h.vn
 $discard,site=webthethao.vn
 $discard,site=thethao247.vn
 $discard,site=bongdaland.vn
-$discard,site=thegioididong.com/game-app
-$discard,site=fptshop.com.vn/tin-tuc
-$discard,site=cellphones.com.vn/sforum
-$discard,site=hoanghamobile.com/tin-tuc
+$discard,site=thegioididong.com
+$discard,site=fptshop.com.vn
+$discard,site=cellphones.com.vn
+$discard,site=hoanghamobile.com
 $discard,site=vnreview.vn
 $discard,site=nghenhinvietnam.vn
 
-! === 3. QUỐC TẾ, FANDOM & COPYCAT / TRANSLATION SCRAPERS ===
+! === 3. International ===
 $discard,site=cnn.com
 $discard,site=bbc.com
 $discard,site=bbc.co.uk
