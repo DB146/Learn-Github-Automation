@@ -1,6 +1,5 @@
 ! name: Block Newspaper, Bad MFA site
-! description: Boost github, reddit, stackoverflow, wikipedia. Discard VN and International news, fandom, and massive code/github copycat translation sites.
-! Public: True
+! description: Boost github, reddit, stackoverflow, wikipedia. Discard news, fandom, code/github copycat translation sites.
 ! author: Custom
 
 ! === 1. BOOST ===
@@ -64,7 +63,6 @@ $discard,site=soha.vn
 $discard,site=baomoi.com
 $discard,site=24h.com.vn
 $discard,site=eva.vn
-$discard,site=ngoisao.vnexpress.net
 $discard,site=genk.vn
 $discard,site=tinhte.vn
 $discard,site=afamily.vn
