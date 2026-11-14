@@ -1,6 +1,7 @@
 ! name: Block Newspaper, Bad MFA site
 ! description: Boost github, reddit, stackoverflow, wikipedia. Discard news, fandom, code/github copycat translation sites.
-! author: Custom
+! public: true
+! author: DB146
 
 ! === 1. BOOST ===
 $boost=1,site=github.com
