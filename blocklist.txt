@@ -84,28 +84,8 @@ downloads.zdnet.de
 softonic.com
 
 ! Software / Apps
-opera.com
-mcafee.com
-mcafeemobilesecurity.com
-mcafeewebadvisor.com
-avast.com
-avg.com
-gendigital.com
-norton.com
-nortonlifelock.com
-avira.com
-ccleaner.com
-ccleanercloud.com
-privateinternetaccess.com
-expressvpn.com
-zenmate.com
-cyberghostvpn.com
-kape.com
-vpnmentor.com
-wizcase.com
-kik.com
-360totalsecurity.com
-ipcgames.com
+/(^|\.)(opera|mcafee|mcafeemobilesecurity|mcafeewebadvisor|avast|avg|gendigital|norton|nortonlifelock|avira|ccleaner|ccleanercloud|privateinternetaccess|expressvpn|zenmate|cyberghostvpn|kape|vpnmentor|wizcase|kik|360totalsecurity|ipcgames)\.com$/$important
+
 
 !Fake
 ublockorigin.com
