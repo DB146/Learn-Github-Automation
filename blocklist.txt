@@ -3,7 +3,8 @@
 
 !Allow
 @@adguard-dns.io
-
+!Regex
+xn--
 
 !Time Wasting
 !!Newspaper
@@ -38,13 +39,9 @@ bigo.tv
 bigovideo.tv
 bigo.sg
 
-
 !Wall Of Shame
 fandom.com
 pinterest.com
-
-
-
 
 !Zalo
 fiza.ai
