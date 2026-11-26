@@ -4,6 +4,7 @@
 !Allow
 @@adguard-dns.io
 
+
 !Time Wasting
 !!Newspaper
 baomoi.com
@@ -43,16 +44,7 @@ fandom.com
 pinterest.com
 
 
-learningvn.com
-coddy.tech
-gitiho.com
-9english.net
-thetoeiclab.vn
-lingolab.vn
-dautoeic.com
-thitoeic.com
-anhngu24h.com
-hoctienganh247.com
+
 
 !Zalo
 fiza.ai
@@ -83,11 +75,6 @@ zinst-stc.zdn.vn
 !zinstant.zadn.vn !Liên quan Setting các máy đã login
 !id.zalo.me !Liên quan đăng nhập trên máy tính
 zchannel-photo-resize.zadn.vn
-
-!Bad
-apk.watch
-apk.dog
-apkgold-vn.com
 
 ! This section of the filterlist contains not recommended/potentially unsafe sites and software domains used in the Plus version
 ! Software / App Sites
