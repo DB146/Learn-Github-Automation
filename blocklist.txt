@@ -6,6 +6,7 @@
 !Regex
 xn--
 docln
+bigo
 
 !Time Wasting
 !!Newspaper
@@ -30,12 +31,6 @@ instagram.com
 !!Video
 twitch.tv
 patreon.com
-
-!Yeah
-bigolive.tv
-bigo.tv
-bigovideo.tv
-bigo.sg
 
 !Wall Of Shame
 fandom.com
