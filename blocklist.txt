@@ -5,6 +5,7 @@
 @@adguard-dns.io
 !Regex
 xn--
+docln
 
 !Time Wasting
 !!Newspaper
@@ -12,9 +13,6 @@ baomoi.com
 bmcdn.com
 
 !!Reading
-!docln.net
-docln.sbs
-docln.top
 hako.vn
 wattpad.com
 
